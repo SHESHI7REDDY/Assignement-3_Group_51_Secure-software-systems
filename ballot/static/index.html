@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electronic Voting Platform</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+<div class="container">
+    <h1>Electronic Voting Platform</h1>
+
+    <h2>House of Representatives Ballot</h2>
+
+    <p>
+        Rank every candidate from 1 to 4.
+        Each preference number must be used once.
+    </p>
+
+    <form id="ballotForm">
+
+        <div class="candidate">
+            <label>Candidate A</label>
+            <select id="CAND-001">
+                <option value="">Select preference</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+
+        <div class="candidate">
+            <label>Candidate B</label>
+            <select id="CAND-002">
+                <option value="">Select preference</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+
+        <div class="candidate">
+            <label>Candidate C</label>
+            <select id="CAND-003">
+                <option value="">Select preference</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+
+        <div class="candidate">
+            <label>Candidate D</label>
+            <select id="CAND-004">
+                <option value="">Select preference</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+
+        <button type="submit">Submit Ballot</button>
+
+    </form>
+
+    <div id="message"></div>
+</div>
+
+<script src="/static/script.js"></script>
+
+</body>
+</html>
