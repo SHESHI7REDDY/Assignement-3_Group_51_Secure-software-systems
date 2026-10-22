@@ -1,7 +1,91 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Voter eligibility and one-vote rule</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><main><a href="/">Back to project</a><h1>Voter eligibility and one-vote rule</h1><p>Owner: Ved</p>
-<p class="notice">Not implemented. This page is a development placeholder.</p>
-<p>Build this module's interface here and connect it to its REST API.</p>
-<a href="/docs">View API documentation</a></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voter Eligibility</title>
+  <link rel="stylesheet" href="/static/eligibility/eligibility.css">
+</head>
+<body>
+<header>
+  <h1>Voter Eligibility &amp; One-Vote Check</h1>
+  <p class="sub">Electronic Voting Platform · Group 51 · Owner: Ved · fictional data only</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. Sign in <span class="tag">mock login – replaced by Authentication module</span></h2>
+    <div class="row">
+      <label>Role
+        <select id="role">
+          <option value="voter">Voter</option>
+          <option value="officer">AEC officer</option>
+          <option value="service">Ballot service</option>
+        </select>
+      </label>
+      <label>User ID <input id="userId" value="u-alice" maxlength="32"></label>
+      <label>Voter ID (voters) <input id="loginVoter" value="V0001" maxlength="10"></label>
+      <button id="btnLogin">Sign in</button>
+    </div>
+    <p id="who" class="muted">Not signed in.</p>
+  </section>
+
+  <section class="card">
+    <h2>2. Check enrolment &amp; eligibility</h2>
+    <div class="row">
+      <label>Voter ID <input id="voterId" value="V0001" maxlength="10"></label>
+      <button id="btnStatus">Enrolment status</button>
+      <button id="btnCheck">Check eligibility</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. Authorise to vote (one vote only)</h2>
+    <div class="row">
+      <label>Channel
+        <select id="channel">
+          <option>ONLINE</option><option>POLLING_STATION</option><option>OVERSEAS_MISSION</option>
+        </select>
+      </label>
+      <button id="btnAuthorise" class="primary">Issue ballot token</button>
+      <button id="btnRedeem">Redeem token (ballot service)</button>
+    </div>
+    <p class="muted">The token is shown once and is not linked to the voter in the database.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Enrol / update address</h2>
+    <div class="grid">
+      <label>Voter ID <input id="enVoter" value="V0100" maxlength="10"></label>
+      <label>Full name <input id="enName" value="Ivy Tran" maxlength="80"></label>
+      <label>Date of birth <input id="enDob" type="date" value="1999-05-01"></label>
+      <label>State
+        <select id="enState"><option>NSW</option><option>VIC</option><option>QLD</option><option>WA</option>
+          <option>SA</option><option>TAS</option><option>ACT</option><option>NT</option></select>
+      </label>
+      <label>Division <input id="enDivision" value="Sydney" maxlength="40"></label>
+      <label>Address <input id="enAddress" value="10 Example St, Sydney" maxlength="120"></label>
+    </div>
+    <div class="row">
+      <button id="btnEnrol">Enrol</button>
+      <button id="btnApprove">Approve pending (officer)</button>
+      <button id="btnAddress">Update address</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>5. Audit trail <span class="tag">officer</span></h2>
+    <div class="row">
+      <button id="btnVerify">Verify hash chain</button>
+      <button id="btnRecent">Recent entries</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Result</h2>
+    <div id="banner" class="banner">—</div>
+    <pre id="out"></pre>
+  </section>
+</main>
+<script src="/static/eligibility/app.js"></script>
+</body>
+</html>

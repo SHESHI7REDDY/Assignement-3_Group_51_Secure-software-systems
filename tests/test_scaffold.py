@@ -10,11 +10,13 @@ def test_health_identifies_unimplemented_security():
 
 def test_sensitive_placeholders_do_not_accept_operations():
     for method, path in [("post", "/auth/login"), ("get", "/auth/verify"),
-                         ("post", "/eligibility/authorizations"), ("post", "/ballots"),
+                         ("post", "/ballots"),
                          ("post", "/candidates"), ("post", "/results/demo/publish")]:
         response = client.request(method, path)
         assert response.status_code == 501
         assert response.json()["detail"]["code"] == "NOT_IMPLEMENTED"
+    # /eligibility/authorizations is implemented (Ved); it now fails closed with 401
+    # without a verified token - see tests/eligibility/test_elig03_access.py
 
 def test_project_pages_and_api_schema_load():
     assert client.get("/").status_code == 200
