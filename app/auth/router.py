@@ -1,21 +1,34 @@
-"""Owner: Varshil. Replace placeholders with reviewed implementation."""
-from fastapi import APIRouter
+
+"""Authentication REST API endpoints."""
+
+from fastapi import APIRouter, status
+
+from app.auth.schemas import RegisterRequest, UserResponse
+from app.auth.service import register_user
 from app.shared.placeholders import unfinished
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-@router.post("/register")
-def operation_1():
-    unfinished("auth")
+
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def register(data: RegisterRequest):
+    return register_user(data)
+
 
 @router.post("/login")
-def operation_2():
+def login():
     unfinished("auth")
+
 
 @router.post("/logout")
-def operation_3():
+def logout():
     unfinished("auth")
 
+
 @router.get("/verify")
-def operation_4():
+def verify():
     unfinished("auth")
