@@ -101,3 +101,24 @@ def get_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict |
         "counted_at": row["counted_at"],
         "published_at": row["published_at"],
     }
+
+
+def publish_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict:
+    """Publish exactly one existing counted election; never publish twice."""
+    if not isinstance(election_id, str) or not election_id.strip():
+        raise ResultStorageError("Valid election_id is required")
+    initialize_database(db_path)
+    from datetime import datetime, timezone
+    stamp = datetime.now(timezone.utc).isoformat()
+    with _connect(db_path) as con:
+        con.execute("BEGIN IMMEDIATE")
+        cursor = con.execute("""
+            UPDATE election_results SET status = 'published', published_at = ?
+            WHERE election_id = ? AND status = 'counted'
+        """, (stamp, election_id))
+        if cursor.rowcount != 1:
+            row = con.execute("SELECT status FROM election_results WHERE election_id = ?", (election_id,)).fetchone()
+            if row is None:
+                raise ResultStorageError("Election results not found")
+            raise ResultStorageError("Election results already published")
+    return get_count(election_id, db_path)

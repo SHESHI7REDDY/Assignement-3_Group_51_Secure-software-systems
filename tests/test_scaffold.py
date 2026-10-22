@@ -11,10 +11,13 @@ def test_health_identifies_unimplemented_security():
 def test_sensitive_placeholders_do_not_accept_operations():
     for method, path in [("post", "/auth/login"), ("get", "/auth/verify"),
                          ("post", "/ballots"),
-                         ("post", "/candidates"), ("post", "/results/demo/publish")]:
+                         ("post", "/candidates")]:
         response = client.request(method, path)
         assert response.status_code == 501
         assert response.json()["detail"]["code"] == "NOT_IMPLEMENTED"
+    # The results publication route is now implemented and must fail closed
+    # when its local admin security configuration is missing.
+    assert client.post("/results/demo/publish").status_code == 503
     # /eligibility/authorizations is implemented (Ved); it now fails closed with 401
     # without a verified token - see tests/eligibility/test_elig03_access.py
 
