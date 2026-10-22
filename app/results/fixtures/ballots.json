@@ -1,0 +1,15 @@
+﻿{
+  "election_id": "DEMO-001",
+  "ballots": [
+    {"ballot_id": "BAL-001", "preferences": ["CAND-A", "CAND-B", "CAND-C"]},
+    {"ballot_id": "BAL-002", "preferences": ["CAND-A", "CAND-B", "CAND-C"]},
+    {"ballot_id": "BAL-003", "preferences": ["CAND-A", "CAND-B", "CAND-C"]},
+    {"ballot_id": "BAL-004", "preferences": ["CAND-A", "CAND-B", "CAND-C"]},
+    {"ballot_id": "BAL-005", "preferences": ["CAND-B", "CAND-A", "CAND-C"]},
+    {"ballot_id": "BAL-006", "preferences": ["CAND-B", "CAND-A", "CAND-C"]},
+    {"ballot_id": "BAL-007", "preferences": ["CAND-B", "CAND-A", "CAND-C"]},
+    {"ballot_id": "BAL-008", "preferences": ["CAND-B", "CAND-A", "CAND-C"]},
+    {"ballot_id": "BAL-009", "preferences": ["CAND-C", "CAND-A", "CAND-B"]},
+    {"ballot_id": "BAL-010", "preferences": ["CAND-C", "CAND-A", "CAND-B"]}
+  ]
+}
