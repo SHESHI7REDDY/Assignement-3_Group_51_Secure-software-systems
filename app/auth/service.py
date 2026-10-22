@@ -1,5 +1,20 @@
 
 """Authentication security and business logic."""
+from app.auth.mfa import (
+    generate_mfa_secret,
+    generate_mfa_uri,
+    verify_mfa_code,
+)
+from app.auth.mfa_security import (
+    encrypt_mfa_secret,
+    decrypt_mfa_secret,
+)
+from app.auth.repository import (
+    get_user_mfa,
+    save_pending_mfa,
+    activate_mfa,
+)
+
 from app.auth.schemas import RegisterRequest, LoginRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import (
@@ -95,3 +110,110 @@ def authenticate_user(data: LoginRequest) -> dict:
         "username": user["username"],
         "role": user["role"],
     }
+
+
+def begin_mfa_enrolment(
+    username: str,
+    password: str,
+) -> dict:
+    """Start MFA setup after checking account credentials."""
+
+    initialise_database()
+
+    user = get_user_by_username(username)
+
+    if user is None:
+        verify_password(password, DUMMY_PASSWORD_HASH)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+        )
+
+    if not verify_password(
+        password, user["password_hash"]
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+        )
+
+    mfa = get_user_mfa(user["id"])
+
+    if mfa is None or mfa["mfa_enabled"]:
+        raise HTTPException(
+            status_code=409,
+            detail="MFA setup is not available",
+        )
+
+    secret = generate_mfa_secret()
+    encrypted = encrypt_mfa_secret(secret)
+
+    if not save_pending_mfa(user["id"], encrypted):
+        raise HTTPException(
+            status_code=409,
+            detail="MFA setup could not be started",
+        )
+
+    return {
+        "message": "MFA setup started",
+        "provisioning_uri": generate_mfa_uri(
+            username, secret
+        ),
+    }
+
+
+def confirm_mfa_enrolment(
+    username: str,
+    password: str,
+    code: str,
+) -> dict:
+    """Verify the setup code before enabling MFA."""
+
+    initialise_database()
+
+    user = get_user_by_username(username)
+
+    if user is None:
+        verify_password(password, DUMMY_PASSWORD_HASH)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+        )
+
+    if not verify_password(
+        password, user["password_hash"]
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials",
+        )
+
+    mfa = get_user_mfa(user["id"])
+
+    if (
+        mfa is None
+        or mfa["mfa_enabled"]
+        or not mfa["mfa_pending_encrypted"]
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="No pending MFA setup",
+        )
+
+    secret = decrypt_mfa_secret(
+        mfa["mfa_pending_encrypted"]
+    )
+
+    if not verify_mfa_code(secret, code):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid MFA code",
+        )
+
+    if not activate_mfa(user["id"]):
+        raise HTTPException(
+            status_code=409,
+            detail="MFA activation failed",
+        )
+
+    return {"message": "MFA enabled successfully"}
