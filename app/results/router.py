@@ -16,6 +16,6 @@ def operation_2(election_id: str):
 def operation_3(election_id: str):
     unfinished("results")
 
-@router.get("/{election_id}/audit")
-def operation_4(election_id: str):
-    unfinished("results")
+
+from app.results.audit_api import router as audit_router
+router.include_router(audit_router)
