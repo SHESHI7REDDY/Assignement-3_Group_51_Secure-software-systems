@@ -60,7 +60,33 @@ def init_db(db_path: Path = DEFAULT_DB_PATH):
     finally:
         connection.close()
 
+def list_candidates(election_id, db_path=DEFAULT_DB_PATH):
+    """Return active candidates in ballot order, or None if election is absent."""
+    connection = get_connection(db_path)
 
+    try:
+        election = connection.execute(
+            "SELECT election_id FROM elections WHERE election_id = ?",
+            (election_id,),
+        ).fetchone()
+
+        if election is None:
+            return None
+
+        rows = connection.execute(
+            """
+            SELECT candidate_id, name, party, ballot_order
+            FROM candidates
+            WHERE election_id = ? AND active = 1
+            ORDER BY ballot_order, candidate_id
+            """,
+            (election_id,),
+        ).fetchall()
+
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+        
 if __name__ == "__main__":
     init_db()
     print(f"Candidate database initialised: {DEFAULT_DB_PATH}")
