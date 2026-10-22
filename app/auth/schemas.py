@@ -26,9 +26,18 @@ class RegisterRequest(BaseModel):
         return value
 
 
+
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z0-9_]+", value):
+            raise ValueError("Invalid username format")
+        return value
+
 
 
 class AuthResponse(BaseModel):
