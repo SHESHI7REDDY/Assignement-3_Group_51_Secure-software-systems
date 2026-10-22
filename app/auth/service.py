@@ -1,6 +1,6 @@
 
 """Authentication security and business logic."""
-
+from app.auth.schemas import RegisterRequest, LoginRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import (
     VerifyMismatchError,
@@ -16,9 +16,12 @@ from app.auth.repository import (
     create_user,
     get_user_by_username,
 )
-from app.auth.schemas import RegisterRequest
+
 # PasswordHasher uses Argon2id by default.
 password_hasher = PasswordHasher()
+DUMMY_PASSWORD_HASH = password_hasher.hash(
+    "DummyPasswordNotUsedForLogin123"
+)
 
 
 def hash_password(password: str) -> str:
@@ -32,6 +35,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return password_hasher.verify(stored_hash, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
+
 
 def register_user(data: RegisterRequest) -> dict:
     """Register a user with a securely hashed password."""
@@ -61,4 +65,33 @@ def register_user(data: RegisterRequest) -> dict:
         "id": user_id,
         "username": data.username,
         "role": "voter",
+    }
+
+
+def authenticate_user(data: LoginRequest) -> dict:
+    """Verify login credentials without revealing account existence."""
+
+    initialise_database()
+
+    user = get_user_by_username(data.username)
+
+    if user is None:
+        # Perform hash verification to reduce username enumeration
+        # through differences in response time.
+        verify_password(data.password, DUMMY_PASSWORD_HASH)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    if not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    return {
+        "id": user["id"],
+        "username": user["username"],
+        "role": user["role"],
     }

@@ -3,8 +3,8 @@
 
 from fastapi import APIRouter, status
 
-from app.auth.schemas import RegisterRequest, UserResponse
-from app.auth.service import register_user
+from app.auth.schemas import RegisterRequest, LoginRequest, UserResponse
+from app.auth.service import register_user, authenticate_user
 from app.shared.placeholders import unfinished
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -19,9 +19,9 @@ def register(data: RegisterRequest):
     return register_user(data)
 
 
-@router.post("/login")
-def login():
-    unfinished("auth")
+@router.post("/login", response_model=UserResponse)
+def login(data: LoginRequest):
+    return authenticate_user(data)
 
 
 @router.post("/logout")
