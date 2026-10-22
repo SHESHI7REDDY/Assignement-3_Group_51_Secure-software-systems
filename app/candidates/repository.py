@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
-
+from app.candidates.schemas import CandidateCreate, CandidateUpdate
 from app.candidates.schemas import CandidateCreate
 from app.shared.config import BASE
 
@@ -172,7 +172,79 @@ def create_candidate(
 
     finally:
         connection.close()
+class CandidateNotFoundError(Exception):
+    """Candidate does not exist in the requested election."""
 
+
+def update_candidate(
+    candidate_id,
+    election_id,
+    changes,
+    db_path=DEFAULT_DB_PATH,
+):
+    changes = CandidateUpdate.model_validate(changes)
+    values = changes.model_dump(exclude_unset=True)
+    connection = get_connection(db_path)
+
+    try:
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+
+            row = connection.execute(
+                """
+                SELECT c.*, e.status AS election_status
+                FROM candidates AS c
+                JOIN elections AS e
+                    ON e.election_id = c.election_id
+                WHERE c.candidate_id = ? AND c.election_id = ?
+                """,
+                (candidate_id, election_id),
+            ).fetchone()
+
+            if row is None:
+                raise CandidateNotFoundError(
+                    "Candidate not found in this election"
+                )
+
+            if row["election_status"] != "DRAFT":
+                raise ElectionLockedError(
+                    "Candidate changes require a draft election"
+                )
+
+            connection.execute(
+                """
+                UPDATE candidates
+                SET name = ?, party = ?, ballot_order = ?
+                WHERE candidate_id = ? AND election_id = ?
+                """,
+                (
+                    values.get("name", row["name"]),
+                    values.get("party", row["party"]),
+                    values.get("ballot_order", row["ballot_order"]),
+                    candidate_id,
+                    election_id,
+                ),
+            )
+
+            updated = connection.execute(
+                """
+                SELECT candidate_id, election_id, name,
+                       party, ballot_order, active
+                FROM candidates
+                WHERE candidate_id = ? AND election_id = ?
+                """,
+                (candidate_id, election_id),
+            ).fetchone()
+
+            return dict(updated)
+
+    except sqlite3.IntegrityError as error:
+        raise CandidateConflictError(
+            "Candidate update conflicts with database constraints"
+        ) from error
+
+    finally:
+        connection.close()
 if __name__ == "__main__":
     init_db()
     print(f"Candidate database initialised: {DEFAULT_DB_PATH}")
