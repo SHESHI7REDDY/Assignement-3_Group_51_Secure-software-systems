@@ -1,11 +1,24 @@
-"""Candidate APIs. Management operations remain unimplemented."""
+"""Candidate listing and protected creation APIs."""
 
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.candidates.repository import DEFAULT_DB_PATH, list_candidates
+from app.candidates.repository import (
+    DEFAULT_DB_PATH,
+    CandidateConflictError,
+    ElectionLockedError,
+    ElectionNotFoundError,
+    create_candidate as save_candidate,
+    list_candidates,
+)
+from app.candidates.schemas import CandidateCreate
+from app.candidates.security import (
+    Identity,
+    ensure_election_permission,
+    require_candidate_manager,
+)
 from app.shared.placeholders import unfinished
 
 
@@ -31,7 +44,10 @@ def get_candidates(
     candidates = list_candidates(election_id, db_path)
 
     if candidates is None:
-        raise HTTPException(status_code=404, detail="Election not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Election not found",
+        )
 
     return {
         "election_id": election_id,
@@ -39,9 +55,34 @@ def get_candidates(
     }
 
 
-@router.post("")
-def create_candidate():
-    unfinished("candidates")
+@router.post("", status_code=201)
+def create_candidate(
+    candidate: CandidateCreate,
+    identity: Identity = Depends(require_candidate_manager),
+    db_path: Path = Depends(get_db_path),
+):
+    ensure_election_permission(identity, candidate.election_id)
+
+    try:
+        return save_candidate(candidate, db_path)
+
+    except ElectionNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Election not found",
+        )
+
+    except ElectionLockedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Candidate changes require a draft election",
+        )
+
+    except CandidateConflictError:
+        raise HTTPException(
+            status_code=409,
+            detail="Candidate data conflicts with existing records",
+        )
 
 
 @router.patch("/{candidate_id}")
