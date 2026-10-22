@@ -53,3 +53,17 @@ class UserResponse(BaseModel):
     id: int
     username: str
     role: str
+
+
+class SessionLoginRequest(LoginRequest):
+    mfa_code: str | None = Field(
+        default=None,
+        min_length=6,
+        max_length=6,
+    )
+
+
+class SessionTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int

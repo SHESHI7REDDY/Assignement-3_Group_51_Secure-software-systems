@@ -32,6 +32,11 @@ from app.auth.repository import (
     get_user_by_username,
 )
 
+import time
+import pyotp
+from app.auth.repository import consume_mfa_counter
+from app.auth.sessions import issue_session
+
 # PasswordHasher uses Argon2id by default.
 password_hasher = PasswordHasher()
 DUMMY_PASSWORD_HASH = password_hasher.hash(
@@ -217,3 +222,52 @@ def confirm_mfa_enrolment(
         )
 
     return {"message": "MFA enabled successfully"}
+
+
+def login_with_session(
+    username: str,
+    password: str,
+    mfa_code: str | None = None,
+) -> dict:
+    """Complete login and issue a session after MFA."""
+
+    user = authenticate_user(
+        LoginRequest(username=username, password=password)
+    )
+
+    mfa = get_user_mfa(user["id"])
+
+    if mfa and mfa["mfa_enabled"]:
+        if not mfa_code:
+            raise HTTPException(
+                status_code=401,
+                detail="MFA code required",
+            )
+
+        secret = decrypt_mfa_secret(
+            mfa["mfa_secret_encrypted"]
+        )
+
+        totp = pyotp.TOTP(secret)
+
+        if not verify_mfa_code(secret, mfa_code):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid MFA code",
+            )
+
+        counter = int(time.time()) // totp.interval
+
+        if not consume_mfa_counter(user["id"], counter):
+            raise HTTPException(
+                status_code=401,
+                detail="MFA code already used",
+            )
+
+    token = issue_session(user["id"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": 1800,
+    }

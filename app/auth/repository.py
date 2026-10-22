@@ -14,7 +14,7 @@ def get_connection():
     """Open a connection with dictionary-style rows."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(DB_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
 
@@ -22,9 +22,11 @@ def get_connection():
 
 
 def initialise_database():
-    """Create the users table and add MFA columns if needed."""
+    """Create user, MFA and session database structures."""
 
     with get_connection() as connection:
+
+        # Create the users table.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -37,13 +39,15 @@ def initialise_database():
             """
         )
 
-        # Check existing database columns.
+        # Check existing columns for MFA migration.
         columns = {
             row["name"]
-            for row in connection.execute("PRAGMA table_info(users)")
+            for row in connection.execute(
+                "PRAGMA table_info(users)"
+            )
         }
 
-        # Additional fields required for MFA.
+        # MFA columns.
         new_columns = {
             "mfa_secret_encrypted": "TEXT",
             "mfa_pending_encrypted": "TEXT",
@@ -51,12 +55,36 @@ def initialise_database():
             "mfa_last_counter": "INTEGER NOT NULL DEFAULT -1",
         }
 
-        # Add missing MFA columns to existing databases.
+        # Add missing MFA columns.
         for column, definition in new_columns.items():
             if column not in columns:
                 connection.execute(
                     f"ALTER TABLE users ADD COLUMN {column} {definition}"
                 )
+
+        # Create session table.
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL,
+                revoked INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (user_id)
+                    REFERENCES users(id)
+            )
+            """
+        )
+
+        # Index for user session lookups.
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS
+            idx_auth_sessions_user_id
+            ON auth_sessions(user_id)
+            """
+        )
 
 
 def create_user(username: str, password_hash: str):
@@ -70,6 +98,7 @@ def create_user(username: str, password_hash: str):
             """,
             (username, password_hash),
         )
+
         return cursor.lastrowid
 
 
@@ -90,7 +119,7 @@ def get_user_by_username(username: str):
 
 
 def get_user_by_id(user_id: int):
-    """Retrieve a user's public account information."""
+    """Retrieve public account information."""
 
     with get_connection() as connection:
         result = connection.execute(
@@ -125,7 +154,10 @@ def get_user_mfa(user_id: int):
         return dict(row) if row else None
 
 
-def save_pending_mfa(user_id: int, encrypted_secret: str) -> bool:
+def save_pending_mfa(
+    user_id: int,
+    encrypted_secret: str,
+) -> bool:
     """Store encrypted MFA setup data before activation."""
 
     with get_connection() as connection:
@@ -143,7 +175,7 @@ def save_pending_mfa(user_id: int, encrypted_secret: str) -> bool:
 
 
 def activate_mfa(user_id: int) -> bool:
-    """Activate an MFA secret after external verification."""
+    """Activate MFA after the service verifies a TOTP code."""
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -164,7 +196,7 @@ def activate_mfa(user_id: int) -> bool:
 
 
 def get_mfa_status(user_id: int) -> bool:
-    """Check whether MFA is enabled for a user."""
+    """Check whether MFA is enabled."""
 
     with get_connection() as connection:
         row = connection.execute(
@@ -177,3 +209,87 @@ def get_mfa_status(user_id: int) -> bool:
         ).fetchone()
 
         return bool(row["mfa_enabled"]) if row else False
+
+
+def consume_mfa_counter(
+    user_id: int,
+    counter: int,
+) -> bool:
+    """Prevent reuse of previously accepted MFA time steps."""
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE users
+            SET mfa_last_counter = ?
+            WHERE id = ?
+              AND mfa_enabled = 1
+              AND mfa_last_counter < ?
+            """,
+            (counter, user_id, counter),
+        )
+
+        return cursor.rowcount == 1
+
+
+def create_session(
+    user_id: int,
+    token_hash: str,
+    created_at: int,
+    expires_at: int,
+):
+    """Store a hashed authentication session token."""
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO auth_sessions (
+                token_hash,
+                user_id,
+                created_at,
+                expires_at
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                token_hash,
+                user_id,
+                created_at,
+                expires_at,
+            ),
+        )
+
+
+def get_session(token_hash: str, current_time: int):
+    """Retrieve an active, unexpired session."""
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT user_id
+            FROM auth_sessions
+            WHERE token_hash = ?
+              AND revoked = 0
+              AND expires_at > ?
+            """,
+            (token_hash, current_time),
+        ).fetchone()
+
+        return dict(row) if row else None
+
+
+def revoke_session(token_hash: str) -> bool:
+    """Invalidate a stored session."""
+
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE auth_sessions
+            SET revoked = 1
+            WHERE token_hash = ?
+              AND revoked = 0
+            """,
+            (token_hash,),
+        )
+
+        return cursor.rowcount == 1
