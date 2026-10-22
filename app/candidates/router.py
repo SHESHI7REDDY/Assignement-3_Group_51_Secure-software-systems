@@ -2,7 +2,9 @@
 
 from pathlib import Path
 from typing import Annotated
-
+from app.candidates.repository import (
+    deactivate_candidate as save_candidate_deactivation,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.candidates.repository import (
@@ -128,3 +130,38 @@ def update_candidate(
             status_code=409,
             detail="Candidate data conflicts with existing records",
         )
+
+@router.post("/{candidate_id}/deactivate")
+def deactivate_candidate(
+    candidate_id: str,
+    election_id: Annotated[
+        str,
+        Query(
+            min_length=1,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9_-]+$",
+        ),
+    ],
+    identity: Identity = Depends(require_candidate_manager),
+    db_path: Path = Depends(get_db_path),
+):
+    ensure_election_permission(identity, election_id)
+
+    try:
+        return save_candidate_deactivation(
+            candidate_id,
+            election_id,
+            db_path,
+        )
+
+    except CandidateNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found in this election",
+        )
+
+    except ElectionLockedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Candidate changes require a draft election",
+        )    
