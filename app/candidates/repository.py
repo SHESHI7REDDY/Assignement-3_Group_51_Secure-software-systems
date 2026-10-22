@@ -2,7 +2,9 @@
 
 import sqlite3
 from pathlib import Path
+from uuid import uuid4
 
+from app.candidates.schemas import CandidateCreate
 from app.shared.config import BASE
 
 
@@ -86,7 +88,91 @@ def list_candidates(election_id, db_path=DEFAULT_DB_PATH):
         return [dict(row) for row in rows]
     finally:
         connection.close()
-        
+class ElectionNotFoundError(Exception):
+    """The requested election does not exist."""
+
+
+class ElectionLockedError(Exception):
+    """Candidate changes are prohibited for this election state."""
+
+
+class CandidateConflictError(Exception):
+    """Candidate data conflicts with database constraints."""
+
+
+def create_candidate(
+    candidate: CandidateCreate,
+    db_path=DEFAULT_DB_PATH,
+):
+    """Create a validated candidate in a draft election.
+
+    Authentication must be enforced by the API before calling this function.
+    The state check and insertion occur in one write transaction.
+    """
+    candidate = CandidateCreate.model_validate(candidate)
+    connection = get_connection(db_path)
+
+    try:
+        with connection:
+            # Prevent another writer changing election state between
+            # this check and the candidate insertion.
+            connection.execute("BEGIN IMMEDIATE")
+
+            election = connection.execute(
+                "SELECT status FROM elections WHERE election_id = ?",
+                (candidate.election_id,),
+            ).fetchone()
+
+            if election is None:
+                raise ElectionNotFoundError("Election not found")
+
+            if election["status"] != "DRAFT":
+                raise ElectionLockedError(
+                    "Candidates can only be added to a draft election"
+                )
+
+            candidate_id = f"CAND-{uuid4().hex}"
+
+            connection.execute(
+                """
+                INSERT INTO candidates (
+                    candidate_id,
+                    election_id,
+                    name,
+                    party,
+                    ballot_order
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    candidate_id,
+                    candidate.election_id,
+                    candidate.name,
+                    candidate.party,
+                    candidate.ballot_order,
+                ),
+            )
+
+            row = connection.execute(
+                """
+                SELECT candidate_id, election_id, name,
+                       party, ballot_order, active
+                FROM candidates
+                WHERE candidate_id = ?
+                """,
+                (candidate_id,),
+            ).fetchone()
+
+            return dict(row)
+
+    except sqlite3.IntegrityError as error:
+        raise CandidateConflictError(
+            "Candidate data conflicts with database constraints"
+        ) from error
+
+    finally:
+        connection.close()
+
 if __name__ == "__main__":
     init_db()
     print(f"Candidate database initialised: {DEFAULT_DB_PATH}")
