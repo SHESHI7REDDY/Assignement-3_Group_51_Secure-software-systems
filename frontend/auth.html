@@ -1,0 +1,425 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <title>Electronic Voting - Authentication</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6fa;
+      color: #253247;
+    }
+
+    header {
+      background: #17365d;
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+    }
+
+    header p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    main {
+      max-width: 540px;
+      margin: 35px auto;
+      padding: 0 16px;
+    }
+
+    section {
+      background: white;
+      padding: 24px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px #00000012;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #bac6d5;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+
+    button {
+      padding: 12px 18px;
+      margin-top: 16px;
+      background: #17365d;
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #28568d;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .secondary {
+      background: #556579;
+    }
+
+    #status {
+      padding: 14px;
+      border-radius: 6px;
+      background: #eaf0f8;
+      min-height: 48px;
+      overflow-wrap: anywhere;
+    }
+
+    .hint {
+      font-size: 13px;
+      color: #59687b;
+      line-height: 1.5;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Electronic Voting Platform</h1>
+    <p>Authentication and User Security Prototype</p>
+  </header>
+
+  <main>
+    <section id="register-section">
+      <h2>Register Account</h2>
+
+      <form id="register-form">
+        <label for="reg-username">Username</label>
+        <input
+          id="reg-username"
+          name="username"
+          minlength="3"
+          maxlength="50"
+          required
+          autocomplete="username"
+        >
+
+        <label for="reg-password">Password</label>
+        <input
+          id="reg-password"
+          name="password"
+          type="password"
+          minlength="12"
+          maxlength="128"
+          required
+          autocomplete="new-password"
+        >
+
+        <p class="hint">
+          Use at least 12 characters, including a letter
+          and a number.
+        </p>
+
+        <button type="submit">Register</button>
+      </form>
+    </section>
+
+    <section id="login-section">
+      <h2>Secure Login</h2>
+
+      <form id="login-form">
+        <label for="login-username">Username</label>
+        <input
+          id="login-username"
+          name="username"
+          required
+          autocomplete="username"
+        >
+
+        <label for="login-password">Password</label>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          required
+          autocomplete="current-password"
+        >
+
+        <label for="mfa-code">
+          Authenticator Code (if MFA is enabled)
+        </label>
+        <input
+          id="mfa-code"
+          name="mfa_code"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          autocomplete="one-time-code"
+          placeholder="6-digit code"
+        >
+
+        <button type="submit">Login</button>
+      </form>
+    </section>
+
+    <section id="session-section" hidden>
+      <h2>Authenticated Session</h2>
+
+      <p id="account-details"></p>
+
+      <button id="verify-button" type="button">
+        Verify Session
+      </button>
+
+      <button
+        id="logout-button"
+        type="button"
+        class="secondary"
+      >
+        Logout
+      </button>
+    </section>
+
+    <section aria-live="polite">
+      <h2>Security Status</h2>
+      <div id="status" role="status">
+        Ready. Register or sign in.
+      </div>
+    </section>
+
+    <p class="hint">
+      Educational demonstration only.
+      Registration does not establish voter eligibility.
+      No votes are cast through this page.
+    </p>
+  </main>
+
+  <script>
+    "use strict";
+
+    // The token is held only in memory.
+    // Reloading the page clears the local login state.
+    let sessionToken = null;
+
+    const statusBox = document.getElementById("status");
+    const registerSection =
+      document.getElementById("register-section");
+    const loginSection =
+      document.getElementById("login-section");
+    const sessionSection =
+      document.getElementById("session-section");
+    const accountDetails =
+      document.getElementById("account-details");
+
+    function showStatus(message) {
+      statusBox.textContent = message;
+    }
+
+    function updateInterface() {
+      const loggedIn = Boolean(sessionToken);
+
+      registerSection.hidden = loggedIn;
+      loginSection.hidden = loggedIn;
+      sessionSection.hidden = !loggedIn;
+
+      if (!loggedIn) {
+        accountDetails.textContent = "";
+      }
+    }
+
+    async function apiRequest(path, method, data = null) {
+      const headers = {
+        "Accept": "application/json"
+      };
+
+      if (data !== null) {
+        headers["Content-Type"] = "application/json";
+      }
+
+      if (sessionToken) {
+        headers["Authorization"] = "Bearer " + sessionToken;
+      }
+
+      const response = await fetch(path, {
+        method: method,
+        headers: headers,
+        body: data === null ? undefined : JSON.stringify(data),
+        cache: "no-store"
+      });
+
+      let result = {};
+
+      try {
+        result = await response.json();
+      } catch (_) {
+        // Handle responses without valid JSON.
+      }
+
+      if (!response.ok) {
+        let message = "Request failed (" + response.status + ")";
+
+        if (typeof result.detail === "string") {
+          message = result.detail;
+        }
+
+        throw new Error(message);
+      }
+
+      return result;
+    }
+
+    async function verifySession() {
+      if (!sessionToken) {
+        showStatus("You are not logged in.");
+        return;
+      }
+
+      try {
+        const user = await apiRequest(
+          "/auth/verify",
+          "GET"
+        );
+
+        accountDetails.textContent =
+          "Username: " + user.username +
+          " | Role: " + user.role;
+
+        showStatus("Session verified successfully.");
+      } catch (error) {
+        sessionToken = null;
+        updateInterface();
+        showStatus("Session verification failed: " + error.message);
+      }
+    }
+
+    document.getElementById("register-form")
+      .addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const form = event.currentTarget;
+        const button = form.querySelector("button");
+        button.disabled = true;
+
+        const username =
+          document.getElementById("reg-username").value.trim();
+        const password =
+          document.getElementById("reg-password").value;
+
+        try {
+          await apiRequest("/auth/register", "POST", {
+            username: username,
+            password: password
+          });
+
+          showStatus(
+            "Registration successful. You can now log in."
+          );
+
+          document.getElementById("login-username").value =
+            username;
+
+          form.reset();
+        } catch (error) {
+          showStatus("Registration failed: " + error.message);
+        } finally {
+          document.getElementById("reg-password").value = "";
+          button.disabled = false;
+        }
+      });
+
+    document.getElementById("login-form")
+      .addEventListener("submit", async function(event) {
+        event.preventDefault();
+
+        const form = event.currentTarget;
+        const button = form.querySelector("button");
+        button.disabled = true;
+
+        const username =
+          document.getElementById("login-username").value.trim();
+        const password =
+          document.getElementById("login-password").value;
+        const code =
+          document.getElementById("mfa-code").value.trim();
+
+        try {
+          const result = await apiRequest(
+            "/auth/login",
+            "POST",
+            {
+              username: username,
+              password: password,
+              mfa_code: code || null
+            }
+          );
+
+          sessionToken = result.access_token;
+          form.reset();
+          updateInterface();
+
+          showStatus("Login successful.");
+          await verifySession();
+        } catch (error) {
+          sessionToken = null;
+          updateInterface();
+          showStatus("Login failed: " + error.message);
+        } finally {
+          document.getElementById("login-password").value = "";
+          document.getElementById("mfa-code").value = "";
+          button.disabled = false;
+        }
+      });
+
+    document.getElementById("verify-button")
+      .addEventListener("click", verifySession);
+
+    document.getElementById("logout-button")
+      .addEventListener("click", async function() {
+        try {
+          await apiRequest("/auth/logout", "POST");
+          showStatus("Logged out successfully.");
+        } catch (error) {
+          showStatus(
+            "Local session cleared. " + error.message
+          );
+        } finally {
+          sessionToken = null;
+          updateInterface();
+        }
+      });
+
+    updateInterface();
+  </script>
+</body>
+</html>
