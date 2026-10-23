@@ -1,0 +1,21 @@
+﻿{
+  "election_id": "DEMO-001",
+  "election_name": "Fictional House of Representatives Election",
+  "candidates": [
+    {
+      "candidate_id": "CAND-A",
+      "name": "Candidate A",
+      "active": true
+    },
+    {
+      "candidate_id": "CAND-B",
+      "name": "Candidate B",
+      "active": true
+    },
+    {
+      "candidate_id": "CAND-C",
+      "name": "Candidate C",
+      "active": true
+    }
+  ]
+}
