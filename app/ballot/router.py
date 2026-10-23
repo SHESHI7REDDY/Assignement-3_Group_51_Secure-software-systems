@@ -1,7 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 
 from .schemas import BallotSubmission
-from .service import validate_ballot
+from .service import validate_ballot, verify_voter_authorisation
 
 
 router = APIRouter(
@@ -32,5 +32,22 @@ def validate_submitted_ballot(ballot: BallotSubmission):
 
     return {
         "message": "Ballot validation successful",
+        "election_id": ballot.election_id
+    }
+@router.post("/submit")
+def submit_ballot(
+    ballot: BallotSubmission,
+    x_auth_token: str | None = Header(default=None),
+    x_mock_role: str | None = Header(default=None)
+):
+    verify_voter_authorisation(
+        x_auth_token,
+        x_mock_role
+    )
+
+    validate_ballot(ballot)
+
+    return {
+        "message": "Authorised ballot accepted",
         "election_id": ballot.election_id
     }

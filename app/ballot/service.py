@@ -49,3 +49,18 @@ def validate_ballot(ballot: BallotSubmission) -> None:
             status_code=400,
             detail="Preferences must contain each rank exactly once."
         )
+def verify_voter_authorisation(
+    auth_token: str | None,
+    role: str | None
+) -> None:
+    if auth_token != "ballot-demo-token":
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing authentication token."
+        )
+
+    if role != "voter":
+        raise HTTPException(
+            status_code=403,
+            detail="Only authorised voters can submit ballots."
+        )
