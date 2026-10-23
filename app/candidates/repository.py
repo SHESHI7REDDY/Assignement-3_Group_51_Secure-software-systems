@@ -5,10 +5,10 @@ from pathlib import Path
 from uuid import uuid4
 from app.candidates.schemas import CandidateCreate, CandidateUpdate
 from app.candidates.schemas import CandidateCreate
-from app.shared.config import BASE
+from app.shared.config import DATA
 
 
-DEFAULT_DB_PATH = BASE / "data" / "candidates.db"
+DEFAULT_DB_PATH = DATA / "candidates.db"
 
 
 def get_connection(db_path: Path = DEFAULT_DB_PATH):

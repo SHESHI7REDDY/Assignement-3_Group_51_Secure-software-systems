@@ -6,6 +6,17 @@ management, ballot submission, counting and result publication in one FastAPI
 application. It uses HTML/CSS/JavaScript pages and local SQLite databases.
 It is a classroom prototype, not a system for running a real public election.
 
+## One-click tutor demonstration
+Install Python 3.12 or newer once, then double-click **Start-Demo.command** on
+macOS or **Start-Demo.bat** on Windows. First launch needs internet access.
+The launcher installs dependencies, prepares separate fictional demo data and
+accounts, starts the server and opens the browser. Its terminal menu opens and
+closes the election. Existing project data is preserved.
+
+See the [one-click demo guide](docs/one-click-demo.md) for account details,
+demonstration steps and troubleshooting. Windows launch has not been tested on
+Windows. The manual setup below remains available.
+
 ## Run the application on macOS
 Use Python 3.12. From the project folder, create an environment once:
 
@@ -103,7 +114,7 @@ Run the full suite from the project root:
 python -m pytest -q
 ```
 
-The reviewed main revision `95a89f1` passed 373 tests. Test totals can change as
+The launcher update passed 376 tests during validation. Test totals can change as
 work continues; use the result from the exact revision submitted in the report.
 Passing tests demonstrate the checked behaviours, not every possible security property.
 
