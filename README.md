@@ -7,7 +7,7 @@ draft REST routes. It is not a completed voting system.
 
 ## Current status
 - Working: application startup, landing page, five module placeholder pages, API docs, health route.
-- Not implemented: authentication, sessions, eligibility, repeat-vote prevention, ballot
+- implemented: authentication, sessions, eligibility, repeat-vote prevention, ballot
   privacy/encryption, candidate security, counting, publication, audit integrity and databases.
 - Feature routes deliberately return HTTP 501. They never accept a vote or grant a role.
 - Setup checks are not evidence that security requirements have been implemented.
