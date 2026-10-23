@@ -1,48 +1,31 @@
-# Ballot Casting and Privacy Module
+# Ballot module
 
-This module implements the Ballot Casting and Privacy functionality for the Electronic Voting Platform.
+Owner: Akshit.
 
-## Implemented Security Requirements
+The active combined application imports `app.ballot`, not the historical
+standalone demonstration in the top-level `ballot/` folder.
 
-### BAL-01 – Preferential Ballot Validation
-The system validates House of Representatives candidate rankings and rejects:
+The module validates preferential rankings, verifies the real logged-in voter,
+checks the election state and eligibility, and stores an encrypted accepted ballot.
+The integrated submission transaction also consumes the voting authorisation and
+updates the voting record. A failed write rolls the transaction back.
 
-- duplicate preference ranks
-- missing preferences
-- duplicate candidates
-- invalid candidate identifiers
+| Area | Main files |
+| --- | --- |
+| HTTP routes | `router.py` |
+| Shared identity, candidate and submission integration | `integration.py` |
+| Trusted local election transitions | `lifecycle.py` |
 
-### BAL-02 – Authorised Ballot Submission
-Ballot submission requires:
+See the [integration guide](../../docs/ballot-integration.md) and
+[combined API summary](../../docs/api-contracts.md). Run the full test suite from
+the repository root using `python -m pytest -q`.
 
-- a valid authentication token
-- the `voter` role
+The election moves from DRAFT to OPEN to CLOSED. Candidate management is limited
+to DRAFT and ballot submission to OPEN. The local lifecycle command cannot reopen
+a CLOSED election.
 
-Unauthorised requests are rejected with HTTP 401 or HTTP 403 responses.
-
-### BAL-03 – Encrypted Ballot Storage
-Ballot preferences are encrypted using Fernet encryption before they are saved to the SQLite database.
-
-The encryption key is stored separately and excluded from Git.
-
-### BAL-04 – Anonymous Ballot Storage
-Stored ballots do not contain:
-
-- voter ID
-- voter name
-- username
-- email address
-- authentication token
-
-This keeps voter identity separate from voting preferences.
-
-## Module Structure
-
-```text
-app/ballot/
-├── __init__.py
-├── repository.py
-├── router.py
-├── schemas.py
-├── service.py
-└── standalone.py
+Accepted ballot rows omit voter and account identity fields. This is basic
+storage separation; it does not establish cryptographic unlinkability against
+an operator who can inspect the databases, logs or timing information.
+Keep the persistent encryption key private and backed up. Losing or replacing
+it can make existing ballots unreadable.
