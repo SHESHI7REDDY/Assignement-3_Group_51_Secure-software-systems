@@ -2,6 +2,7 @@
 """SQLite persistence for the authentication subsystem."""
 
 import sqlite3
+import time
 from pathlib import Path
 
 from app.shared.config import DATA
@@ -9,9 +10,12 @@ from app.shared.config import DATA
 
 DB_PATH = Path(DATA) / "auth_users.db"
 
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_SECONDS = 15 * 60
+
 
 def get_connection():
-    """Open a connection with dictionary-style rows."""
+    """Open a SQLite connection with dictionary-style rows."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     connection = sqlite3.connect(DB_PATH, timeout=10)
@@ -22,11 +26,9 @@ def get_connection():
 
 
 def initialise_database():
-    """Create user, MFA and session database structures."""
+    """Create and migrate authentication database tables."""
 
     with get_connection() as connection:
-
-        # Create the users table.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -39,7 +41,6 @@ def initialise_database():
             """
         )
 
-        # Check existing columns for MFA migration.
         columns = {
             row["name"]
             for row in connection.execute(
@@ -47,22 +48,21 @@ def initialise_database():
             )
         }
 
-        # MFA columns.
         new_columns = {
             "mfa_secret_encrypted": "TEXT",
             "mfa_pending_encrypted": "TEXT",
             "mfa_enabled": "INTEGER NOT NULL DEFAULT 0",
             "mfa_last_counter": "INTEGER NOT NULL DEFAULT -1",
+            "failed_attempts": "INTEGER NOT NULL DEFAULT 0",
+            "locked_until": "INTEGER NOT NULL DEFAULT 0",
         }
 
-        # Add missing MFA columns.
         for column, definition in new_columns.items():
             if column not in columns:
                 connection.execute(
                     f"ALTER TABLE users ADD COLUMN {column} {definition}"
                 )
 
-        # Create session table.
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -71,24 +71,21 @@ def initialise_database():
                 created_at INTEGER NOT NULL,
                 expires_at INTEGER NOT NULL,
                 revoked INTEGER NOT NULL DEFAULT 0,
-                FOREIGN KEY (user_id)
-                    REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
             """
         )
 
-        # Index for user session lookups.
         connection.execute(
             """
-            CREATE INDEX IF NOT EXISTS
-            idx_auth_sessions_user_id
+            CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id
             ON auth_sessions(user_id)
             """
         )
 
 
 def create_user(username: str, password_hash: str):
-    """Store a user with a password hash, never plaintext."""
+    """Store a user without storing a plaintext password."""
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -98,19 +95,17 @@ def create_user(username: str, password_hash: str):
             """,
             (username, password_hash),
         )
-
         return cursor.lastrowid
 
 
 def get_user_by_username(username: str):
-    """Retrieve a user using a parameterised SQL query."""
+    """Retrieve authentication details using parameterised SQL."""
 
     with get_connection() as connection:
         result = connection.execute(
             """
             SELECT id, username, password_hash, role
-            FROM users
-            WHERE username = ?
+            FROM users WHERE username = ?
             """,
             (username,),
         ).fetchone()
@@ -119,14 +114,13 @@ def get_user_by_username(username: str):
 
 
 def get_user_by_id(user_id: int):
-    """Retrieve public account information."""
+    """Retrieve public user information."""
 
     with get_connection() as connection:
         result = connection.execute(
             """
             SELECT id, username, role
-            FROM users
-            WHERE id = ?
+            FROM users WHERE id = ?
             """,
             (user_id,),
         ).fetchone()
@@ -135,18 +129,15 @@ def get_user_by_id(user_id: int):
 
 
 def get_user_mfa(user_id: int):
-    """Retrieve MFA settings for an existing user."""
+    """Retrieve a user's MFA settings."""
 
     with get_connection() as connection:
         row = connection.execute(
             """
-            SELECT id,
-                   mfa_secret_encrypted,
+            SELECT id, mfa_secret_encrypted,
                    mfa_pending_encrypted,
-                   mfa_enabled,
-                   mfa_last_counter
-            FROM users
-            WHERE id = ?
+                   mfa_enabled, mfa_last_counter
+            FROM users WHERE id = ?
             """,
             (user_id,),
         ).fetchone()
@@ -154,28 +145,23 @@ def get_user_mfa(user_id: int):
         return dict(row) if row else None
 
 
-def save_pending_mfa(
-    user_id: int,
-    encrypted_secret: str,
-) -> bool:
-    """Store encrypted MFA setup data before activation."""
+def save_pending_mfa(user_id: int, encrypted_secret: str) -> bool:
+    """Save an encrypted pending MFA secret."""
 
     with get_connection() as connection:
         cursor = connection.execute(
             """
             UPDATE users
             SET mfa_pending_encrypted = ?
-            WHERE id = ?
-              AND mfa_enabled = 0
+            WHERE id = ? AND mfa_enabled = 0
             """,
             (encrypted_secret, user_id),
         )
-
         return cursor.rowcount == 1
 
 
 def activate_mfa(user_id: int) -> bool:
-    """Activate MFA after the service verifies a TOTP code."""
+    """Activate a previously verified MFA secret."""
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -191,31 +177,23 @@ def activate_mfa(user_id: int) -> bool:
             """,
             (user_id,),
         )
-
         return cursor.rowcount == 1
 
 
 def get_mfa_status(user_id: int) -> bool:
-    """Check whether MFA is enabled."""
+    """Return whether MFA is enabled."""
 
     with get_connection() as connection:
         row = connection.execute(
-            """
-            SELECT mfa_enabled
-            FROM users
-            WHERE id = ?
-            """,
+            "SELECT mfa_enabled FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
 
         return bool(row["mfa_enabled"]) if row else False
 
 
-def consume_mfa_counter(
-    user_id: int,
-    counter: int,
-) -> bool:
-    """Prevent reuse of previously accepted MFA time steps."""
+def consume_mfa_counter(user_id: int, counter: int) -> bool:
+    """Prevent reusing previously accepted TOTP intervals."""
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -228,7 +206,6 @@ def consume_mfa_counter(
             """,
             (counter, user_id, counter),
         )
-
         return cursor.rowcount == 1
 
 
@@ -238,36 +215,26 @@ def create_session(
     created_at: int,
     expires_at: int,
 ):
-    """Store a hashed authentication session token."""
+    """Store a hashed session token."""
 
     with get_connection() as connection:
         connection.execute(
             """
-            INSERT INTO auth_sessions (
-                token_hash,
-                user_id,
-                created_at,
-                expires_at
-            )
+            INSERT INTO auth_sessions
+            (token_hash, user_id, created_at, expires_at)
             VALUES (?, ?, ?, ?)
             """,
-            (
-                token_hash,
-                user_id,
-                created_at,
-                expires_at,
-            ),
+            (token_hash, user_id, created_at, expires_at),
         )
 
 
 def get_session(token_hash: str, current_time: int):
-    """Retrieve an active, unexpired session."""
+    """Return an active, unexpired session."""
 
     with get_connection() as connection:
         row = connection.execute(
             """
-            SELECT user_id
-            FROM auth_sessions
+            SELECT user_id FROM auth_sessions
             WHERE token_hash = ?
               AND revoked = 0
               AND expires_at > ?
@@ -279,7 +246,7 @@ def get_session(token_hash: str, current_time: int):
 
 
 def revoke_session(token_hash: str) -> bool:
-    """Invalidate a stored session."""
+    """Revoke the specified session."""
 
     with get_connection() as connection:
         cursor = connection.execute(
@@ -291,5 +258,86 @@ def revoke_session(token_hash: str) -> bool:
             """,
             (token_hash,),
         )
-
         return cursor.rowcount == 1
+
+
+def get_login_security(user_id: int):
+    """Retrieve failed-attempt and lockout information."""
+
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT failed_attempts, locked_until
+            FROM users WHERE id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+        return dict(row) if row else None
+
+
+def is_account_locked(user_id: int) -> bool:
+    """Check whether the temporary lockout is active."""
+
+    state = get_login_security(user_id)
+
+    return bool(
+        state and state["locked_until"] > int(time.time())
+    )
+
+
+def record_failed_login(user_id: int) -> bool:
+    """Atomically update failures and apply temporary lockout."""
+
+    now = int(time.time())
+
+    with get_connection() as connection:
+        # Reserve a write lock so attempts are counted consistently.
+        connection.execute("BEGIN IMMEDIATE")
+
+        row = connection.execute(
+            """
+            SELECT failed_attempts, locked_until
+            FROM users WHERE id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+
+        if row is None:
+            return False
+
+        if row["locked_until"] > now:
+            return True
+
+        attempts = (
+            0 if row["locked_until"] != 0
+            else row["failed_attempts"]
+        ) + 1
+
+        locked = attempts >= MAX_FAILED_ATTEMPTS
+        locked_until = now + LOCKOUT_SECONDS if locked else 0
+
+        connection.execute(
+            """
+            UPDATE users
+            SET failed_attempts = ?, locked_until = ?
+            WHERE id = ?
+            """,
+            (attempts, locked_until, user_id),
+        )
+
+        return locked
+
+
+def reset_failed_logins(user_id: int) -> None:
+    """Reset the failed-attempt count after successful login."""
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE users
+            SET failed_attempts = 0, locked_until = 0
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
