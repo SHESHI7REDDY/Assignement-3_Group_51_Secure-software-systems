@@ -1,7 +1,189 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Candidate management and administrator security</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><main><a href="/">Back to project</a><h1>Candidate management and administrator security</h1><p>Owner: Sashi</p>
-<p class="notice">Not implemented. This page is a development placeholder.</p>
-<p>Build this module's interface here and connect it to its REST API.</p>
-<a href="/docs">View API documentation</a></main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'"
+  >
+
+  <title>Candidate Directory</title>
+
+  <link rel="stylesheet" href="/static/candidates/style.css">
+
+  <script src="/static/candidates/app.js" defer></script>
+  <script src="/static/candidates/manage.js" defer></script>
+</head>
+
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Electronic Voting Platform</p>
+      <h1>Candidate directory</h1>
+      <p>View active candidates for an election.</p>
+
+      <p class="notice">
+        Local prototype with fictional demonstration data.
+      </p>
+    </header>
+
+    <section class="panel" aria-labelledby="search-heading">
+      <h2 id="search-heading">Choose an election</h2>
+
+      <form id="election-form">
+        <div class="field">
+          <label for="election-id">Election ID</label>
+
+          <input
+            id="election-id"
+            name="election_id"
+            type="text"
+            value="DEMO-A3-ELECTIONS"
+            maxlength="64"
+            pattern="[A-Za-z0-9_-]+"
+            required
+          >
+        </div>
+
+        <button id="load-button" type="submit">
+          Load candidates
+        </button>
+      </form>
+
+      <p id="status" role="status" aria-live="polite">
+        Enter an election ID and select Load candidates.
+      </p>
+    </section>
+
+    <section class="panel" aria-labelledby="results-heading">
+      <div class="results-header">
+        <h2 id="results-heading">Active candidates</h2>
+        <span id="candidate-count">0 candidates</span>
+      </div>
+
+      <div class="table-container">
+        <table id="candidate-table" hidden>
+          <caption id="table-caption">
+            Candidates in ballot order
+          </caption>
+
+          <thead>
+            <tr>
+              <th scope="col">Order</th>
+              <th scope="col">Name</th>
+              <th scope="col">Party</th>
+              <th scope="col">Candidate ID</th>
+            </tr>
+          </thead>
+
+          <tbody id="candidate-rows"></tbody>
+        </table>
+      </div>
+
+      <p id="empty-state">No election loaded yet.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="manage-heading">
+      <h2 id="manage-heading">Manage candidates</h2>
+
+      <p>
+        Uses the election ID entered above.
+        Only authorised officers can change candidates in a draft election.
+      </p>
+
+      <form id="manage-form">
+        <div class="field">
+          <label for="manage-id">Candidate ID</label>
+
+          <input
+            id="manage-id"
+            name="candidate_id"
+            type="text"
+          >
+
+          <small>
+            Leave blank when creating. Copy the ID from the candidate
+            list when editing or deactivating.
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="manage-name">Candidate name</label>
+
+          <input
+            id="manage-name"
+            name="name"
+            type="text"
+            maxlength="120"
+          >
+        </div>
+
+        <div class="field">
+          <label for="manage-party">Party</label>
+
+          <input
+            id="manage-party"
+            name="party"
+            type="text"
+            maxlength="120"
+          >
+        </div>
+
+        <div class="field">
+          <label for="manage-order">Ballot position</label>
+
+          <input
+            id="manage-order"
+            name="ballot_order"
+            type="number"
+            min="1"
+            max="1000"
+            step="1"
+          >
+        </div>
+
+        <div class="field">
+          <label for="manage-token">Officer access token</label>
+
+          <input
+            id="manage-token"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          >
+
+          <small>
+            Enter the token without “Bearer”.
+            This page clears it after each request.
+          </small>
+        </div>
+
+        <p>
+          To create or edit, enter the name, party and ballot position.
+          To deactivate, enter the candidate ID and officer token.
+        </p>
+
+        <button type="submit" value="create">
+          Create candidate
+        </button>
+
+        <button type="submit" value="edit">
+          Save candidate changes
+        </button>
+
+        <button type="submit" value="deactivate">
+          Deactivate candidate
+        </button>
+      </form>
+
+      <p id="manage-status" role="status" aria-live="polite">
+        Enter the candidate details and your officer token.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

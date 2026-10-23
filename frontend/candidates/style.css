@@ -1,0 +1,173 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: #18293d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f1f5f9;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 22px;
+}
+
+header {
+  margin-bottom: 26px;
+}
+
+.eyebrow {
+  color: #17645d;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 4px 0;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+}
+
+.notice {
+  display: inline-block;
+  background: #fff1cf;
+  padding: 8px 14px;
+  border-radius: 6px;
+}
+
+.panel {
+  margin-bottom: 22px;
+  padding: 26px;
+  border: 1px solid #dce4ec;
+  border-radius: 12px;
+  background: white;
+}
+
+form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.field {
+  flex: 1;
+  min-width: 220px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  font: inherit;
+  border: 1px solid #8d9eb0;
+  border-radius: 6px;
+}
+
+button {
+  padding: 13px 20px;
+  border: 0;
+  border-radius: 6px;
+  background: #12665d;
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid #639df1;
+  outline-offset: 3px;
+}
+
+#status {
+  margin-bottom: 0;
+}
+
+#status[data-state="error"] {
+  color: #a32222;
+}
+
+#status[data-state="success"] {
+  color: #12665d;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+#candidate-count,
+#empty-state {
+  color: #475569;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+caption {
+  text-align: left;
+  color: #475569;
+  padding-bottom: 12px;
+}
+
+th,
+td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #dce4ec;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+th {
+  background: #f0f5f9;
+}
+
+td:last-child {
+  font-size: 0.85rem;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 550px) {
+  .panel {
+    padding: 18px;
+  }
+
+  button {
+    width: 100%;
+  }
+}
