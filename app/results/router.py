@@ -1,21 +1,19 @@
-"""Owner: Moinul. Replace placeholders with reviewed implementation."""
+"""Historical fixture API router used by isolated module tests.
+
+The server entry points mount platform_router instead.
+"""
 from fastapi import APIRouter
-from app.shared.placeholders import unfinished
 
 router = APIRouter(prefix="/results", tags=["results"])
 
-@router.post("/count")
-def operation_1():
-    unfinished("results")
+from app.results.audit_api import router as audit_router
+router.include_router(audit_router)
 
-@router.get("/{election_id}")
-def operation_2(election_id: str):
-    unfinished("results")
+from app.results.count_api import router as count_router
+router.include_router(count_router)
 
-@router.post("/{election_id}/publish")
-def operation_3(election_id: str):
-    unfinished("results")
+from app.results.publish_api import router as publication_router
+router.include_router(publication_router)
 
-@router.get("/{election_id}/audit")
-def operation_4(election_id: str):
-    unfinished("results")
+from app.results.read_api import router as read_router
+router.include_router(read_router)

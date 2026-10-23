@@ -1,7 +1,41 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ballot casting and privacy</title><link rel="stylesheet" href="/static/style.css"></head>
-<body><main><a href="/">Back to project</a><h1>Ballot casting and privacy</h1><p>Owner: Akshit</p>
-<p class="notice">Not implemented. This page is a development placeholder.</p>
-<p>Build this module's interface here and connect it to its REST API.</p>
-<a href="/docs">View API documentation</a></main></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cast a fictional ballot</title>
+  <link rel="stylesheet" href="/static/ballot/style.css">
+  <script src="/static/ballot/script.js" defer></script>
+</head>
+<body>
+<main class="container">
+  <a href="/">Home</a>
+  <h1>Electronic Voting Platform</h1>
+  <p>Local prototype using fictional election data.</p>
+  <h2>Log in to vote</h2>
+  <p>Use your existing voter account. Your account must be linked to the electoral roll by the local operator.</p>
+  <form id="loginForm">
+    <label for="username">Username</label>
+    <input id="username" autocomplete="username" required maxlength="64">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <label for="mfa">MFA code, if enabled</label>
+    <input id="mfa" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+    <button id="loginButton" type="submit">Log in</button>
+  </form>
+  <p id="identity" role="status"></p>
+  <button id="logoutButton" type="button" hidden>Log out</button>
+  <h2>Rank your candidates</h2>
+  <p id="election" role="status">Loading election…</p>
+  <p>Rank every active candidate. Use each number once, starting at 1.</p>
+  <button id="refreshButton" type="button">Reload election</button>
+  <form id="ballotForm">
+    <fieldset id="choices" disabled><legend>Preferences</legend><div id="candidates"></div></fieldset>
+    <label><input id="confirmVote" type="checkbox" required disabled> I have checked my preferences. I understand that an accepted ballot uses my one vote for this election.</label>
+    <button id="submitButton" type="submit" disabled>Submit ballot</button>
+  </form>
+  <p id="message" role="status" aria-live="polite"></p>
+  <p>Returning to this page requires another login. Credentials and tokens are not saved in browser storage.</p>
+</main>
+</body>
+</html>

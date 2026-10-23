@@ -1,9 +1,9 @@
 name: eligibility-security-tests
 on:
   push:
-    paths: ["app/eligibility/**", "tests/eligibility/**", "frontend/eligibility/**"]
+    paths: ["app/**", "tests/**", "frontend/**", "requirements.txt", "pytest.ini", ".github/workflows/eligibility-tests.yml"]
   pull_request:
-    paths: ["app/eligibility/**", "tests/eligibility/**", "frontend/eligibility/**"]
+    paths: ["app/**", "tests/**", "frontend/**", "requirements.txt", "pytest.ini", ".github/workflows/eligibility-tests.yml"]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,8 +13,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt bandit pip-audit
-      - name: Eligibility security unit tests
-        run: python -m pytest tests/eligibility -q
+      - name: Platform security and integration tests
+        run: python -m pytest -q
       - name: Static security scan (Bandit)
         run: bandit -q -r app/eligibility -ll
       - name: Dependency vulnerability scan

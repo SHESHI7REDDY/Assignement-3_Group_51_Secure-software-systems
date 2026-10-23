@@ -88,6 +88,8 @@ def check(body: VoterRef, p: Principal = Depends(require_roles("voter", "officer
 def authorise(body: AuthoriseRequest, p: Principal = Depends(require_roles("voter", "officer")),
               conn=Depends(get_conn), settings: Settings = Depends(get_settings)):
     ensure_self_or_officer(p, body.voter_id)
+    if not settings.mock_auth:
+        raise HTTPException(409, "Submit through /ballots/submit so the vote and ballot are saved together")
     if p.role == "voter" and body.channel != "ONLINE":
         raise HTTPException(403, "Voters may only self-authorise for online voting")
     try:

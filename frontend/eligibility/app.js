@@ -1,87 +1,207 @@
-// Eligibility GUI. All output uses textContent (never innerHTML) to prevent XSS.
 "use strict";
-let accessToken = null;   // kept in memory only, not localStorage
-let lastBallotToken = null;
+
+// Each page session holds its token in memory. Refreshing requires sign-in again.
+let accessToken = null;
+let identity = null;
+let busy = false;
 const $ = (id) => document.getElementById(id);
 
-function show(ok, title, data) {
-  const b = $("banner");
-  b.textContent = title;
-  b.className = "banner " + (ok ? "ok" : "bad");
+function show(ok, title, data = {}) {
+  $("banner").textContent = title;
+  $("banner").className = "banner " + (ok ? "ok" : "bad");
   $("out").textContent = JSON.stringify(data, null, 2);
 }
 
-async function call(method, url, body) {
-  const headers = { "Content-Type": "application/json" };
-  if (accessToken) headers.Authorization = "Bearer " + accessToken;
-  const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined,
-                                 credentials: "same-origin" });
-  let data = null;
-  try { data = await res.json(); } catch { data = {}; }
-  return { ok: res.ok, status: res.status, data };
-}
-
-async function run(label, method, url, body, okText) {
-  const r = await call(method, url, body);
-  const detail = r.data && r.data.detail;
-  show(r.ok, r.ok ? (okText ? okText(r.data) : label + " – OK") :
-       `${label} – HTTP ${r.status}: ${typeof detail === "string" ? detail : "rejected"}`, r.data);
-  return r;
-}
-
-$("btnLogin").onclick = async () => {
-  const role = $("role").value;
-  const body = { user_id: $("userId").value.trim(), role };
-  if (role === "voter") body.voter_id = $("loginVoter").value.trim();
-  accessToken = null;
-  const r = await run("Sign in", "POST", "/dev/mock-token", body, () => "Signed in");
-  if (r.ok) {
-    accessToken = r.data.access_token;
-    $("who").textContent = `Signed in as ${body.user_id} (${role}${body.voter_id ? ", " + body.voter_id : ""})`;
-    $("out").textContent = "{ \"access_token\": \"[hidden]\" }";
+function updateControls() {
+  $("btnLogin").disabled = busy || Boolean(identity);
+  $("btnLogout").disabled = busy || !accessToken;
+  for (const id of ["username", "password", "mfaCode"]) {
+    $(id).disabled = busy || Boolean(identity);
   }
-};
+  document.querySelectorAll("[data-protected]").forEach((control) => {
+    control.disabled = busy || !identity;
+  });
+  const officer = identity?.role === "officer";
+  $("officerPanel").hidden = !officer;
+  $("btnApprove").hidden = !officer;
+  $("voterId").readOnly = !officer;
+  $("enVoter").readOnly = !officer;
+}
 
-$("btnStatus").onclick = () => run("Enrolment status", "GET",
-  "/eligibility/status/" + encodeURIComponent($("voterId").value.trim()), null,
-  (d) => `Enrolment: ${d.enrolment_status}`);
+function clearSession() {
+  accessToken = null;
+  identity = null;
+  $("who").textContent = "Not signed in.";
+  $("voterId").value = "";
+  $("enVoter").value = "";
+  updateControls();
+}
 
-$("btnCheck").onclick = async () => {
-  const r = await call("POST", "/eligibility/check", { voter_id: $("voterId").value.trim() });
-  if (r.ok) show(r.data.eligible, r.data.eligible ? "ELIGIBLE to vote" : "NOT eligible – " + r.data.reason, r.data);
-  else show(false, `Check – HTTP ${r.status}: ${typeof r.data.detail === "string" ? r.data.detail : "rejected"}`, r.data);
-};
+function errorText(response) {
+  const detail = response.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return "Check the fields and try again.";
+  return "Request rejected.";
+}
 
-$("btnAuthorise").onclick = async () => {
-  const r = await run("Authorise", "POST", "/eligibility/authorizations",
-    { voter_id: $("voterId").value.trim(), channel: $("channel").value },
-    () => "Ballot token issued – voter now marked as voted");
-  if (r.ok) lastBallotToken = r.data.ballot_token;
-};
+async function call(method, url, body) {
+  const headers = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (accessToken) headers.Authorization = "Bearer " + accessToken;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(url, {
+      method, headers, signal: controller.signal, cache: "no-store",
+      credentials: "same-origin",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    let data = {};
+    try { data = await response.json(); } catch { /* Keep a generic error. */ }
+    if (response.status === 401 && accessToken) clearSession();
+    return { ok: response.ok, status: response.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
-$("btnRedeem").onclick = () => {
-  if (!lastBallotToken) return show(false, "No ballot token issued in this session yet", {});
-  return run("Redeem", "POST", "/eligibility/authorizations/redeem", { ballot_token: lastBallotToken },
-    () => "Token accepted (single use)");
-};
+async function operation(label, action) {
+  if (busy) return;
+  busy = true;
+  updateControls();
+  try {
+    await action();
+  } catch {
+    show(false, label + " could not finish. Check the server and your connection.");
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}
 
-$("btnEnrol").onclick = () => run("Enrol", "POST", "/eligibility/enrol", {
-  voter_id: $("enVoter").value.trim(), full_name: $("enName").value.trim(), date_of_birth: $("enDob").value,
-  citizenship: "AU", state: $("enState").value, division: $("enDivision").value.trim(),
-  address: $("enAddress").value.trim() }, (d) => `Enrolment ${d.enrolment_status}`);
+async function run(label, method, url, body, success) {
+  if (!identity) {
+    show(false, "Sign in with your registered account first.");
+    return null;
+  }
+  const response = await call(method, url, body);
+  if (!response.ok) {
+    show(false, `${label} — HTTP ${response.status}: ${errorText(response)}`);
+  } else {
+    show(true, success ? success(response.data) : label + " successful.", response.data);
+  }
+  return response;
+}
 
-$("btnApprove").onclick = () => run("Approve", "POST",
-  "/eligibility/enrolments/" + encodeURIComponent($("enVoter").value.trim()) + "/approve");
+$("loginForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (identity) return;
+  operation("Sign in", async () => {
+    let pendingToken = null;
+    try {
+      const response = await call("POST", "/auth/login", {
+        username: $("username").value.trim(),
+        password: $("password").value,
+        mfa_code: $("mfaCode").value.trim() || null,
+      });
+      if (!response.ok) {
+        show(false, `Sign in — HTTP ${response.status}: ${errorText(response)}`);
+        return;
+      }
+      if (typeof response.data.access_token !== "string" || !response.data.access_token) {
+        show(false, "The login service returned an unexpected response.");
+        return;
+      }
+      accessToken = response.data.access_token;
+      pendingToken = accessToken;
+      const verification = await call("GET", "/auth/verify");
+      if (!verification.ok) {
+        show(false, `Session verification — HTTP ${verification.status}: ${errorText(verification)}`);
+        return;
+      }
+      const verified = verification.data;
+      if (typeof verified.user_id !== "string" ||
+          !["voter", "officer"].includes(verified.role)) {
+        show(false, "This account cannot use voter or officer eligibility functions.");
+        return;
+      }
+      if (verified.role === "voter" && !/^V\d{4,9}$/.test(verified.voter_id || "")) {
+        show(false, "This account has no electoral-roll link. Contact the demo operator.");
+        return;
+      }
+      identity = verified;
+      pendingToken = null;
+      $("who").textContent = `Signed in as ${verified.username} (${verified.role})`;
+      $("voterId").value = verified.voter_id || "";
+      $("enVoter").value = verified.voter_id || "";
+      show(true, "Session verified. You can now check enrolment and eligibility.", {
+        username: verified.username, role: verified.role, voter_id: verified.voter_id,
+      });
+    } finally {
+      $("password").value = "";
+      $("mfaCode").value = "";
+      if (pendingToken) {
+        accessToken = pendingToken;
+        try { await call("POST", "/auth/logout"); } catch { /* Session expires normally. */ }
+        clearSession();
+      }
+    }
+  });
+});
 
-$("btnAddress").onclick = () => run("Update address", "PATCH",
+$("btnLogout").onclick = () => operation("Sign out", async () => {
+  try {
+    const response = await call("POST", "/auth/logout");
+    show(response.ok, response.ok ? "Signed out successfully." :
+      "Local session cleared. Server sign-out was not confirmed.");
+  } finally {
+    clearSession();
+  }
+});
+
+$("btnStatus").onclick = () => operation("Enrolment status", () => run(
+  "Enrolment status", "GET",
+  "/eligibility/status/" + encodeURIComponent($("voterId").value.trim()),
+  undefined, (data) => `Enrolment: ${data.enrolment_status}`,
+));
+
+$("btnCheck").onclick = () => operation("Eligibility check", async () => {
+  const response = await run("Eligibility check", "POST", "/eligibility/check",
+    { voter_id: $("voterId").value.trim() });
+  if (response?.ok) {
+    show(response.data.eligible === true, response.data.eligible ?
+      "ELIGIBLE to vote. No vote has been recorded." :
+      "NOT eligible — " + response.data.reason, response.data);
+  }
+});
+
+$("btnEnrol").onclick = () => operation("Enrolment", () => run(
+  "Enrolment", "POST", "/eligibility/enrol", {
+    voter_id: $("enVoter").value.trim(), full_name: $("enName").value.trim(),
+    date_of_birth: $("enDob").value, citizenship: "AU", state: $("enState").value,
+    division: $("enDivision").value.trim(), address: $("enAddress").value.trim(),
+  }, (data) => `Enrolment: ${data.enrolment_status}`,
+));
+
+$("btnApprove").onclick = () => operation("Approve enrolment", () => run(
+  "Approve enrolment", "POST",
+  "/eligibility/enrolments/" + encodeURIComponent($("enVoter").value.trim()) + "/approve",
+));
+
+$("btnAddress").onclick = () => operation("Address update", () => run(
+  "Address update", "PATCH",
   "/eligibility/electors/" + encodeURIComponent($("enVoter").value.trim()) + "/address",
-  { address: $("enAddress").value.trim(), division: $("enDivision").value.trim() });
+  { address: $("enAddress").value.trim(), division: $("enDivision").value.trim() },
+));
 
-$("btnVerify").onclick = async () => {
-  const r = await call("GET", "/eligibility/audit/verify");
-  if (r.ok) show(r.data.valid, r.data.valid ? `Audit chain intact (${r.data.entries} entries)` :
-                 `Audit chain BROKEN at entry ${r.data.broken_at_seq}`, r.data);
-  else show(false, `Audit – HTTP ${r.status}`, r.data);
-};
+$("btnVerify").onclick = () => operation("Audit verification", async () => {
+  const response = await run("Audit verification", "GET", "/eligibility/audit/verify");
+  if (response?.ok) show(response.data.valid === true,
+    response.data.valid ? "Audit chain intact." : "Audit chain verification failed.", response.data);
+});
 
-$("btnRecent").onclick = () => run("Recent audit", "GET", "/eligibility/audit/recent");
+$("btnRecent").onclick = () => operation("Recent audit", () => run(
+  "Recent audit", "GET", "/eligibility/audit/recent",
+));
+
+updateControls();

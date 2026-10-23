@@ -79,7 +79,8 @@ def check(conn, settings: Settings, actor: Principal, voter_id: str) -> Decision
     return decision
 
 
-def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str, channel: str) -> dict:
+def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str, channel: str,
+                      *, manage_transaction: bool = True) -> dict:
     """Atomically: re-check eligibility, mark the voter as voted, and issue a
     single-use ballot token that is NOT linked to the voter.
 
@@ -88,7 +89,10 @@ def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str,
       2. Conditional UPDATE ... WHERE has_voted = 0; rowcount must be exactly 1.
       3. PRIMARY KEY (election_id, voter_id) prevents duplicate status rows.
     """
-    conn.execute("BEGIN IMMEDIATE")
+    if manage_transaction:
+        conn.execute("BEGIN IMMEDIATE")
+    elif not conn.in_transaction:
+        raise RuntimeError("An outer transaction is required")
     try:
         elector, voted = _load(conn, settings, voter_id)
         decision = evaluate(elector, voted, settings.election_date)
@@ -97,7 +101,8 @@ def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str,
         if not decision.eligible:
             audit.append(conn, actor.role, actor_ref, "AUTHORISE", subject,
                          f"DENIED:{decision.reason}:{decision.detail}")
-            conn.execute("COMMIT")
+            if manage_transaction:
+                conn.execute("COMMIT")
             if decision.reason == ALREADY_VOTED:
                 raise AlreadyVoted()
             raise NotEligible(decision.reason)
@@ -110,7 +115,8 @@ def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str,
             (channel, settings.election_id, voter_id))
         if cur.rowcount != 1:
             audit.append(conn, actor.role, actor_ref, "AUTHORISE", subject, "DENIED:ALREADY_VOTED:race")
-            conn.execute("COMMIT")
+            if manage_transaction:
+                conn.execute("COMMIT")
             raise AlreadyVoted()
 
         token = secrets.token_urlsafe(32)  # 256-bit CSPRNG token
@@ -118,29 +124,42 @@ def authorise_to_vote(conn, settings: Settings, actor: Principal, voter_id: str,
         conn.execute("INSERT INTO ballot_tokens (token_hash, election_id, division, expires_at) VALUES (?,?,?,?)",
                      (hash_token(token), settings.election_id, elector["division"], expires.isoformat()))
         audit.append(conn, actor.role, actor_ref, "AUTHORISE", subject, "GRANTED")
-        conn.execute("COMMIT")
+        if manage_transaction:
+            conn.execute("COMMIT")
         return {"ballot_token": token, "election_id": settings.election_id,
                 "division": elector["division"], "expires_at": expires.isoformat()}
     except (AlreadyVoted, NotEligible):
         raise
     except Exception:
-        conn.execute("ROLLBACK")
+        if manage_transaction and conn.in_transaction:
+            conn.execute("ROLLBACK")
         raise
 
 
-def redeem_token(conn, settings: Settings, actor: Principal, token: str) -> dict | None:
-    """Called by the Ballot module. Single use: conditional UPDATE on redeemed = 0."""
+def redeem_token(conn, settings: Settings, actor: Principal, token: str,
+                 *, manage_transaction: bool = True) -> dict | None:
+    """Redeem once, optionally inside the ballot's existing transaction."""
     h = hash_token(token)
-    conn.execute("BEGIN IMMEDIATE")
-    cur = conn.execute(
-        "UPDATE ballot_tokens SET redeemed = 1 WHERE token_hash = ? AND redeemed = 0 AND expires_at > ?",
-        (h, _now().isoformat()))
-    ok = cur.rowcount == 1
-    row = conn.execute("SELECT election_id, division FROM ballot_tokens WHERE token_hash = ?", (h,)).fetchone() if ok else None
-    audit.append(conn, actor.role, pseudonymise(settings, actor.user_id), "REDEEM_TOKEN",
-                 h[:20], "ACCEPTED" if ok else "REJECTED")
-    conn.execute("COMMIT")
-    return dict(row) if row else None
+    if manage_transaction:
+        conn.execute("BEGIN IMMEDIATE")
+    elif not conn.in_transaction:
+        raise RuntimeError("An outer transaction is required")
+    try:
+        cur = conn.execute(
+            "UPDATE ballot_tokens SET redeemed = 1 WHERE token_hash = ? AND redeemed = 0 AND expires_at > ?",
+            (h, _now().isoformat()))
+        ok = cur.rowcount == 1
+        row = conn.execute("SELECT election_id, division FROM ballot_tokens WHERE token_hash = ?",
+                           (h,)).fetchone() if ok else None
+        audit.append(conn, actor.role, pseudonymise(settings, actor.user_id), "REDEEM_TOKEN",
+                     h[:20], "ACCEPTED" if ok else "REJECTED")
+        if manage_transaction:
+            conn.execute("COMMIT")
+        return dict(row) if row else None
+    except Exception:
+        if manage_transaction and conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
 
 
 def enrol(conn, settings: Settings, actor: Principal, data: dict) -> str:

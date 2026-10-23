@@ -1,0 +1,56 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    width: 600px;
+    margin: 50px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+}
+
+h2 {
+    margin-top: 30px;
+}
+
+.candidate {
+    display: flex;
+    justify-content: space-between;
+    margin: 15px 0;
+    padding: 12px;
+    background: #f8f8f8;
+    border-radius: 6px;
+}
+
+select {
+    padding: 6px;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#message {
+    margin-top: 20px;
+    font-weight: bold;
+}
+.container { width: auto; max-width: 680px; margin: 24px auto; }
+input:not([type="checkbox"]) { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 16px; }
+fieldset { border: 1px solid #bbb; margin: 16px 0; }
+button:disabled { cursor: default; opacity: .55; }
+.candidate { gap: 16px; align-items: center; }
+#message { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .container { margin: 0; padding: 16px; } .candidate { flex-direction: column; align-items: stretch; } }
