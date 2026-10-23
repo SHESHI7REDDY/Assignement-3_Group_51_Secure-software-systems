@@ -1,7 +1,10 @@
 from fastapi import HTTPException
 
 from .schemas import BallotSubmission
+import json
+from pathlib import Path
 
+from cryptography.fernet import Fernet
 
 VALID_CANDIDATES = {
     "CAND-001",
@@ -64,3 +67,38 @@ def verify_voter_authorisation(
             status_code=403,
             detail="Only authorised voters can submit ballots."
         )
+KEY_FILE = Path("data/ballot_key.key")
+
+
+def load_or_create_key() -> bytes:
+    KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    if KEY_FILE.exists():
+        return KEY_FILE.read_bytes()
+
+    key = Fernet.generate_key()
+    KEY_FILE.write_bytes(key)
+    return key
+
+
+cipher = Fernet(load_or_create_key())
+
+
+def encrypt_ballot(ballot: BallotSubmission) -> str:
+    ballot_data = {
+        "preferences": [
+            {
+                "candidate_id": preference.candidate_id,
+                "rank": preference.rank
+            }
+            for preference in ballot.preferences
+        ]
+    }
+
+    ballot_json = json.dumps(ballot_data)
+
+    encrypted_value = cipher.encrypt(
+        ballot_json.encode("utf-8")
+    )
+
+    return encrypted_value.decode("utf-8")
