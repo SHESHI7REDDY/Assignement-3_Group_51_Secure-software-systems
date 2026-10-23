@@ -1,7 +1,7 @@
 # Voter eligibility and one-vote rule
 Owner: Ved · Branch: `feature/eligibility` · Requirements: ELIG-01 to ELIG-04
 
-Status: implemented (ELIG-01 to ELIG-04 fully implemented, 45 security tests).
+Status: eligibility rules and access checks have module tests. Real account identity is connected; ballot submission integration remains pending.
 
 | File | Purpose |
 | --- | --- |
@@ -12,15 +12,20 @@ Status: implemented (ELIG-01 to ELIG-04 fully implemented, 45 security tests).
 | `audit.py` | SHA-256 hash-chained audit log (ELIG-04) |
 | `repository.py` | SQLite schema + fictional seed data |
 | `config.py` | Settings from environment variables only |
-| `standalone.py` | Standalone demo with development mock login |
+| `standalone.py` | Standalone server including real authentication |
 
-## Run standalone (demo without the Auth module)
+## Run standalone with real authentication
 ```bash
-python -m app.eligibility.repository                       # seed 8 fictional voters into data/eligibility.db
+export ELECTION_ID=DEMO-A3-ELECTIONS
+python -m scripts.prepare_demo_roll                        # preserve existing voter and vote records
 python -m uvicorn app.eligibility.standalone:app --reload --port 8002
 ```
 Open http://127.0.0.1:8002/ (GUI) and http://127.0.0.1:8002/docs.
-Only the standalone app exposes `POST /dev/mock-token`. The shared app (`app/main.py`) does not.
+The standalone server now includes `/auth/login`, `/auth/verify` and `/auth/logout`.
+Use a registered account with a trusted voter link. The GUI no longer accepts
+caller-selected roles or voter identities. Mock authentication is disabled by
+default; the standalone mock endpoint is for explicitly enabled API test setups
+only. The shared app (`app/main.py`) never exposes `/dev/mock-token`.
 
 ## Test
 ```bash
@@ -55,3 +60,28 @@ V0006 already voted · V0007 eligible (race test) · V0008 turns 18 on election 
 ## Assumptions
 A voter is marked as voted when the ballot token is issued (as a paper roll is marked when the ballot is handed over).
 Settings come from environment variables; without secrets set, random per-process development values are used.
+
+## Shared application GUI
+
+Start the shared app on port 8000 with the verified identity configuration:
+
+```bash
+export ELECTION_ID=DEMO-A3-ELECTIONS
+export ELIG_MOCK_AUTH=0
+export ELIG_AUTH_VERIFY_URL=http://127.0.0.1:8000/auth/verify
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Open `/static/eligibility/index.html`. Sign in with the registered account.
+For a voter, the linked voter ID is filled from the verified identity and cannot
+be edited in the normal interface. The server still enforces ownership.
+Tokens remain in page memory, passwords are cleared after login attempts, and
+logout revokes the page's session. A refresh requires sign-in again.
+
+The GUI supports enrolment status, eligibility checks, enrolment and address
+updates. Officer approval and audit controls are shown only to an officer.
+Hiding controls is a usability feature; server checks provide access control.
+Ballot-token issuance is deliberately not exposed by this intermediate GUI:
+checking eligibility must not mark the voter as voted before the ballot workflow
+is connected. Backend authorisation and redemption APIs remain available for
+the reviewed ballot integration and their existing tests.

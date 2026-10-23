@@ -20,3 +20,9 @@ button.primary { background:var(--brand); color:#fff; }
 .banner.ok { background:var(--okbg); color:var(--ok); }
 .banner.bad { background:var(--badbg); color:var(--bad); }
 pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:6px; overflow:auto; font-size:12.5px; max-height:340px; }
+
+[hidden] { display: none !important; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+input:read-only { background: #f5f6f8; }
+#btnLogout { margin-top: 12px; }
+#loginForm input { max-width: 240px; }

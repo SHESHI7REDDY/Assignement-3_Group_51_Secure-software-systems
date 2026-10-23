@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>Voter Eligibility</title>
   <link rel="stylesheet" href="/static/eligibility/eligibility.css">
 </head>
@@ -13,78 +14,76 @@
 </header>
 <main>
   <section class="card">
-    <h2>1. Sign in <span class="tag">mock login – replaced by Authentication module</span></h2>
-    <div class="row">
-      <label>Role
-        <select id="role">
-          <option value="voter">Voter</option>
-          <option value="officer">AEC officer</option>
-          <option value="service">Ballot service</option>
-        </select>
+    <h2>1. Sign in with your registered account</h2>
+    <form id="loginForm" class="row">
+      <label>Username
+        <input id="username" autocomplete="username" minlength="3" maxlength="50"
+               pattern="[A-Za-z0-9_]+" required>
       </label>
-      <label>User ID <input id="userId" value="u-alice" maxlength="32"></label>
-      <label>Voter ID (voters) <input id="loginVoter" value="V0001" maxlength="10"></label>
-      <button id="btnLogin">Sign in</button>
-    </div>
-    <p id="who" class="muted">Not signed in.</p>
+      <label>Password
+        <input id="password" type="password" autocomplete="current-password" required>
+      </label>
+      <label>Authenticator code if enabled
+        <input id="mfaCode" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]{6}" maxlength="6">
+      </label>
+      <button id="btnLogin" type="submit">Sign in</button>
+    </form>
+    <button id="btnLogout" type="button" disabled>Sign out</button>
+    <p id="who" class="muted" role="status" aria-live="polite">Not signed in.</p>
+    <p class="muted">Use your registered username and password. Your voter record and permissions come from the server.</p>
+  </section>
+
+  <section class="card" aria-labelledby="resultHeading">
+    <h2 id="resultHeading">Result</h2>
+    <div id="banner" class="banner" role="status" aria-live="polite">Sign in to check your enrolment.</div>
+    <pre id="out"></pre>
   </section>
 
   <section class="card">
     <h2>2. Check enrolment &amp; eligibility</h2>
     <div class="row">
-      <label>Voter ID <input id="voterId" value="V0001" maxlength="10"></label>
-      <button id="btnStatus">Enrolment status</button>
-      <button id="btnCheck">Check eligibility</button>
+      <label>Voter ID <input id="voterId" maxlength="10" readonly data-protected></label>
+      <button id="btnStatus" type="button" data-protected disabled>Enrolment status</button>
+      <button id="btnCheck" type="button" data-protected disabled>Check eligibility</button>
     </div>
   </section>
 
   <section class="card">
-    <h2>3. Authorise to vote (one vote only)</h2>
-    <div class="row">
-      <label>Channel
-        <select id="channel">
-          <option>ONLINE</option><option>POLLING_STATION</option><option>OVERSEAS_MISSION</option>
-        </select>
-      </label>
-      <button id="btnAuthorise" class="primary">Issue ballot token</button>
-      <button id="btnRedeem">Redeem token (ballot service)</button>
-    </div>
-    <p class="muted">The token is shown once and is not linked to the voter in the database.</p>
+    <h2>3. Voting authorisation</h2>
+    <p>Checking eligibility does not cast a vote or use your voting authorisation.</p>
+    <p class="muted">Ballot authorisation will be connected to the ballot submission screen in the next integration step.</p>
   </section>
 
   <section class="card">
-    <h2>4. Enrol / update address</h2>
+    <h2>4. Enrol or update address</h2>
+    <p class="muted">Enrolment is for Australian citizens. A voter submission requires officer approval. An existing enrolment can use the address update controls.</p>
     <div class="grid">
-      <label>Voter ID <input id="enVoter" value="V0100" maxlength="10"></label>
-      <label>Full name <input id="enName" value="Ivy Tran" maxlength="80"></label>
-      <label>Date of birth <input id="enDob" type="date" value="1999-05-01"></label>
+      <label>Voter ID <input id="enVoter" readonly data-protected maxlength="10"></label>
+      <label>Full name <input id="enName"  maxlength="80"></label>
+      <label>Date of birth <input id="enDob" type="date" ></label>
       <label>State
         <select id="enState"><option>NSW</option><option>VIC</option><option>QLD</option><option>WA</option>
           <option>SA</option><option>TAS</option><option>ACT</option><option>NT</option></select>
       </label>
-      <label>Division <input id="enDivision" value="Sydney" maxlength="40"></label>
-      <label>Address <input id="enAddress" value="10 Example St, Sydney" maxlength="120"></label>
+      <label>Division <input id="enDivision"  maxlength="40"></label>
+      <label>Address <input id="enAddress"  maxlength="120"></label>
     </div>
     <div class="row">
-      <button id="btnEnrol">Enrol</button>
-      <button id="btnApprove">Approve pending (officer)</button>
-      <button id="btnAddress">Update address</button>
+      <button id="btnEnrol" type="button" data-protected disabled>Enrol</button>
+      <button hidden id="btnApprove" type="button" data-protected disabled>Approve pending (officer)</button>
+      <button id="btnAddress" type="button" data-protected disabled>Update address</button>
     </div>
   </section>
 
-  <section class="card">
+  <section id="officerPanel" class="card" hidden>
     <h2>5. Audit trail <span class="tag">officer</span></h2>
     <div class="row">
-      <button id="btnVerify">Verify hash chain</button>
-      <button id="btnRecent">Recent entries</button>
+      <button id="btnVerify" type="button" data-protected disabled>Verify hash chain</button>
+      <button id="btnRecent" type="button" data-protected disabled>Recent entries</button>
     </div>
   </section>
 
-  <section class="card">
-    <h2>Result</h2>
-    <div id="banner" class="banner">—</div>
-    <pre id="out"></pre>
-  </section>
 </main>
 <script src="/static/eligibility/app.js"></script>
 </body>
