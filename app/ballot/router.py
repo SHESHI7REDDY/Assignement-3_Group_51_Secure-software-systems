@@ -39,7 +39,6 @@ def validate_submitted_ballot(ballot: BallotSubmission):
         "election_id": ballot.election_id
     }
 @router.post("/submit")
-@router.post("/submit")
 def submit_ballot(
     ballot: BallotSubmission,
     x_auth_token: str | None = Header(default=None),
