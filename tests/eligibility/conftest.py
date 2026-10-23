@@ -1,4 +1,6 @@
 """Fixtures for Ved's eligibility security tests: fresh fictional DB per test."""
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,7 +12,8 @@ from app.eligibility.standalone import create_app
 
 @pytest.fixture
 def settings(tmp_path):
-    s = Settings(db_path=str(tmp_path / "test.db"), auth_secret="test-secret-" + "x" * 40,
+    s = Settings(db_path=str(tmp_path / "test.db"), election_id="FED-2026",
+                 election_date=date(2026, 12, 5), auth_secret="test-secret-" + "x" * 40,
                  pseudonym_key="test-pseudo-" + "y" * 40, mock_auth=True)
     seed(s)
     return s

@@ -15,7 +15,7 @@ def test_dashboard_is_served_from_existing_static_mount():
 
 def test_dashboard_has_accessible_controls():
     html = (FRONTEND / 'results' / 'index.html').read_text(encoding='utf-8')
-    for identifier in ('lookup-form', 'election', 'public-result', 'admin-token',
+    for identifier in ('lookup-form', 'election', 'public-result', 'admin-login', 'admin-username', 'admin-password',
                        'count-button', 'publish-button', 'verify-button', 'events-button'):
         assert f'id="{identifier}"' in html
 
@@ -28,7 +28,9 @@ def test_dashboard_assets_are_served():
 
 def test_dashboard_uses_same_origin_and_no_browser_storage_for_token():
     js = (FRONTEND / 'results' / 'dashboard.js').read_text(encoding='utf-8')
-    assert 'X-Results-Admin-Token' in js
+    assert 'Authorization' in js
+    assert 'X-Results-Admin-Token' not in js
+    assert '/auth/login' in js
     assert 'localStorage' not in js
     assert 'sessionStorage' not in js
     assert 'innerHTML' not in js

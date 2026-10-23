@@ -3,6 +3,7 @@
 Only anonymous count summaries are stored; no voter identifiers or raw ballots.
 The caller supplies a database path for test isolation.
 """
+from contextlib import closing, nullcontext
 import json
 import sqlite3
 from pathlib import Path
@@ -43,10 +44,10 @@ def initialize_database(db_path: str | Path = DEFAULT_DB_PATH) -> None:
         """)
 
 
-def save_count(result: Mapping, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+def save_count(result: Mapping, db_path: str | Path = DEFAULT_DB_PATH, *, connection=None) -> None:
     """Insert a count atomically; never overwrite a finalized count.
 
-    Publication will be implemented separately in a later milestone.
+    An optional connection joins the caller transaction without committing it.
     """
     election_id = result.get("election_id")
     winner = result.get("winner_id")
@@ -66,25 +67,33 @@ def save_count(result: Mapping, db_path: str | Path = DEFAULT_DB_PATH) -> None:
         raise ResultStorageError("rounds must be JSON serializable") from exc
     from datetime import datetime, timezone
     counted_at = datetime.now(timezone.utc).isoformat()
-    initialize_database(db_path)
+    if connection is None:
+        initialize_database(db_path)
+    elif not connection.in_transaction:
+        raise ResultStorageError("An outer transaction is required")
     try:
-        with _connect(db_path) as con:
+        scope = nullcontext(connection) if connection is not None else closing(_connect(db_path))
+        with scope as con:
             con.execute("""
                 INSERT INTO election_results
                     (election_id, total_ballots, winner_id, rounds_json, counted_at)
                 VALUES (?, ?, ?, ?, ?)
             """, (election_id, total, winner, rounds_json, counted_at))
+            if connection is None:
+                con.commit()
     except sqlite3.IntegrityError as exc:
         raise ResultStorageError("A result for this election already exists") from exc
 
 
-def get_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict | None:
+def get_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH, *, connection=None) -> dict | None:
     """Return a stored count including publication status, or None if missing.
 
     This internal function must only be exposed via an authorized API route.
     """
-    initialize_database(db_path)
-    with _connect(db_path) as con:
+    if connection is None:
+        initialize_database(db_path)
+    scope = nullcontext(connection) if connection is not None else closing(_connect(db_path))
+    with scope as con:
         row = con.execute("""
             SELECT election_id, total_ballots, winner_id, rounds_json,
                    status, counted_at, published_at
@@ -103,15 +112,20 @@ def get_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict |
     }
 
 
-def publish_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> dict:
+def publish_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH, *, connection=None) -> dict:
     """Publish exactly one existing counted election; never publish twice."""
     if not isinstance(election_id, str) or not election_id.strip():
         raise ResultStorageError("Valid election_id is required")
-    initialize_database(db_path)
+    if connection is None:
+        initialize_database(db_path)
+    elif not connection.in_transaction:
+        raise ResultStorageError("An outer transaction is required")
     from datetime import datetime, timezone
     stamp = datetime.now(timezone.utc).isoformat()
-    with _connect(db_path) as con:
-        con.execute("BEGIN IMMEDIATE")
+    scope = nullcontext(connection) if connection is not None else closing(_connect(db_path))
+    with scope as con:
+        if connection is None:
+            con.execute("BEGIN IMMEDIATE")
         cursor = con.execute("""
             UPDATE election_results SET status = 'published', published_at = ?
             WHERE election_id = ? AND status = 'counted'
@@ -121,4 +135,6 @@ def publish_count(election_id: str, db_path: str | Path = DEFAULT_DB_PATH) -> di
             if row is None:
                 raise ResultStorageError("Election results not found")
             raise ResultStorageError("Election results already published")
-    return get_count(election_id, db_path)
+        if connection is None:
+            con.commit()
+        return get_count(election_id, db_path, connection=con)

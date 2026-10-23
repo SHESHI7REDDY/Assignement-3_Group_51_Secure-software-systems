@@ -1,4 +1,7 @@
-"""Owner: Moinul. Replace placeholders with reviewed implementation."""
+"""Historical fixture API router used by isolated module tests.
+
+The server entry points mount platform_router instead.
+"""
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/results", tags=["results"])

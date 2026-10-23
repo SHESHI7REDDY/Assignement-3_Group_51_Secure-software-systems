@@ -1,3 +1,5 @@
+> Historical fixture API notes. The shared and standalone server entry points now use real login and accepted ballots. See [results integration](../../docs/results-integration.md) for the current setup and endpoints. These fixture routes remain only in isolated module tests.
+
 ﻿# Results & Audit Module — API Contract
 
 ## 1. Module Overview

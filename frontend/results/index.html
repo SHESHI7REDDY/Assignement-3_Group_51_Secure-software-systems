@@ -9,24 +9,31 @@
 </head>
 <body>
   <main>
-    <nav><a href="/">← Group 51 home</a> <a href="/docs">API documentation</a></nav>
-    <header><p class="eyebrow">Fictional election · Independent prototype · Moinul</p><h1>Counting, Results &amp; Audit</h1><p>Preferential counting and tamper-evident audit demonstrations. Not an operational voting service.</p></header>
+    <nav><a href="/">Group 51 home</a><a href="/docs">API documentation</a></nav>
+    <header><p class="eyebrow">Fictional election · Group 51 · Moinul</p><h1>Counting, Results &amp; Audit</h1><p>Results from accepted prototype ballots. This educational system is not an operational voting service.</p></header>
+    <p id="election-state" class="message" role="status">Loading election state…</p>
     <section class="panel" aria-labelledby="lookup-heading">
       <h2 id="lookup-heading">Public results</h2>
-      <form id="lookup-form"><label for="election">Election ID</label><div class="controls"><input id="election" name="election" value="DEMO-001" maxlength="80" required><button type="submit">Load published results</button></div></form>
-      <p id="public-message" class="message" role="status" aria-live="polite">Only published election results are visible here.</p>
+      <form id="lookup-form"><label for="election">Election ID</label><div class="controls"><input id="election" name="election" maxlength="64" required><button type="submit">Load published results</button></div></form>
+      <p id="public-message" class="message" role="status" aria-live="polite">Results are hidden until an administrator publishes them.</p>
       <div id="public-result" hidden>
-        <div class="summary"><div><span class="muted">Winner</span><strong id="winner">—</strong></div><div><span class="muted">Anonymous ballots</span><strong id="ballots">—</strong></div><div><span class="muted">Published UTC</span><strong id="published">—</strong></div></div>
+        <div class="summary"><div><span class="muted">Winner</span><strong id="winner">—</strong></div><div><span class="muted">Accepted ballots</span><strong id="ballots">—</strong></div><div><span class="muted">Published UTC</span><strong id="published">—</strong></div></div>
         <h3>Counting rounds</h3><div id="rounds"></div>
       </div>
     </section>
     <section class="panel" aria-labelledby="admin-heading">
-      <h2 id="admin-heading">Local administrator demonstration</h2>
-      <p class="muted">Mock token for coursework only. Never use this demo mechanism for a real election.</p>
-      <label for="admin-token">Administrator token (kept in memory, not saved)</label>
-      <input id="admin-token" type="password" autocomplete="off" placeholder="Enter RESULTS_ADMIN_TOKEN">
-      <div class="controls actions"><button id="count-button" type="button">Calculate fixture election</button><button id="publish-button" type="button">Publish result</button><button id="verify-button" type="button">Verify audit integrity</button><button id="events-button" type="button">Load audit events</button></div>
-      <p id="admin-message" class="message" role="status" aria-live="polite">Use the same election ID entered above.</p>
+      <h2 id="admin-heading">Administrator login</h2>
+      <p class="muted">Use the separate results administrator account prepared by the local operator. Officers and voters cannot count or publish.</p>
+      <form id="admin-login">
+        <label for="admin-username">Username</label><input id="admin-username" autocomplete="username" required>
+        <label for="admin-password">Password</label><input id="admin-password" type="password" autocomplete="current-password" required>
+        <label for="admin-mfa">MFA code, if enabled</label><input id="admin-mfa" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+        <button id="login-button" type="submit">Log in</button>
+      </form>
+      <p id="admin-identity" role="status">Logged out.</p>
+      <button id="logout-button" type="button" hidden>Log out</button>
+      <div class="controls actions"><button id="count-button" type="button" disabled>Count accepted ballots</button><button id="publish-button" type="button" disabled>Publish result</button><button id="verify-button" type="button" disabled>Verify audit integrity</button><button id="events-button" type="button" disabled>Load audit events</button></div>
+      <p id="admin-message" class="message" role="status" aria-live="polite">The election must be CLOSED before counting and publication. Login tokens stay in memory only.</p>
       <pre id="admin-output" class="output" hidden></pre>
     </section>
   </main>
