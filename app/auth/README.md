@@ -1,18 +1,18 @@
-# Authentication and sessions
-Owner: Varshil
+# Authentication module
 
-Status: not implemented. All feature endpoints return HTTP 501.
+Owner: Varshil.
 
-Run the shared app with `python -m uvicorn app.main:app --reload`.
-For this module alone, use `python -m uvicorn app.auth.standalone:app --reload`.
-Open `/static/auth/index.html` for the placeholder screen and `/docs` for routes.
-Run this module's future tests with `python -m pytest tests/auth`.
+The combined application uses this module for account registration, login,
+server-side sessions, identity verification, logout and administrator audit access.
+Passwords use Argon2id. Public registration creates voters only.
 
-Implement in your own feature branch:
-- GUI in frontend/auth/ and validated API models in schemas.py.
-- API routes, service rules, SQLite schema/repository and fictional seed data.
-- Positive and negative security tests linked to your four requirement issues.
-- API contract changes, report evidence and setup/demo instructions.
+Read the [authentication implementation notes](../../docs/varshil_auth_implementation.md)
+for the detailed design and tests. Run the full suite with `python -m pytest -q`.
+Use the authentication page linked from the combined application's home page.
 
-Agree authentication, authorization and integration behavior before replacing placeholders.
-Never treat a client-supplied user ID or role as proof of authority.
+Trusted local profile links connect an account to a fictional electoral-roll ID.
+Officer roles and election assignments must be provisioned by a trusted operator.
+An account link does not by itself grant eligibility or officer permissions.
+
+MFA helpers and login enforcement exist in the backend. A complete public MFA
+enrolment API and interface are not provided; report this limitation explicitly.
