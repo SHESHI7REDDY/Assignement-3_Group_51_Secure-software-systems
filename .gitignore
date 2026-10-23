@@ -242,3 +242,6 @@ __marimo__/
 
 .venv-integration/
 .venv-integration/
+# Private launcher environment, fictional databases and credentials
+.venv-demo/
+.demo-data/
