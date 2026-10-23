@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Header
 
+from .repository import initialise_database, save_ballot
 from .schemas import BallotSubmission
-from .service import validate_ballot, verify_voter_authorisation
-
+from .service import (
+    encrypt_ballot,
+    validate_ballot,
+    verify_voter_authorisation,
+)
 
 router = APIRouter(
     prefix="/ballots",
@@ -35,6 +39,7 @@ def validate_submitted_ballot(ballot: BallotSubmission):
         "election_id": ballot.election_id
     }
 @router.post("/submit")
+@router.post("/submit")
 def submit_ballot(
     ballot: BallotSubmission,
     x_auth_token: str | None = Header(default=None),
@@ -47,7 +52,17 @@ def submit_ballot(
 
     validate_ballot(ballot)
 
+    initialise_database()
+
+    encrypted_value = encrypt_ballot(ballot)
+
+    ballot_id = save_ballot(
+        election_id=ballot.election_id,
+        encrypted_ballot=encrypted_value
+    )
+
     return {
-        "message": "Authorised ballot accepted",
+        "message": "Ballot accepted and securely stored",
+        "ballot_id": ballot_id,
         "election_id": ballot.election_id
     }
