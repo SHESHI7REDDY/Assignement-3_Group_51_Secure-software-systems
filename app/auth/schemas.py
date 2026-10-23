@@ -55,6 +55,12 @@ class UserResponse(BaseModel):
     role: str
 
 
+class VerifiedIdentityResponse(UserResponse):
+    user_id: str
+    voter_id: str | None = None
+    managed_election_ids: list[str] = Field(default_factory=list)
+
+
 class SessionLoginRequest(LoginRequest):
     mfa_code: str | None = Field(
         default=None,

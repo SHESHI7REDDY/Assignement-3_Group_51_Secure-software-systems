@@ -17,6 +17,7 @@ from fastapi.security import (
 from app.auth.schemas import (
     RegisterRequest,
     UserResponse,
+    VerifiedIdentityResponse,
     SessionLoginRequest,
     SessionTokenResponse,
 )
@@ -29,6 +30,7 @@ from app.auth.sessions import (
     invalidate_session,
 )
 from app.auth.repository import get_user_by_id
+from app.auth.profiles import identity_for_user
 from app.auth.audit import (
     record_security_event,
     get_recent_audit_events,
@@ -156,7 +158,7 @@ def login(data: SessionLoginRequest):
 
 @router.get(
     "/verify",
-    response_model=UserResponse,
+    response_model=VerifiedIdentityResponse,
 )
 def verify(session: SessionDependency):
     """Verify a session and return public account details."""
@@ -175,7 +177,7 @@ def verify(session: SessionDependency):
         user_id,
     )
 
-    return user
+    return identity_for_user(user)
 
 
 @router.post("/logout")
