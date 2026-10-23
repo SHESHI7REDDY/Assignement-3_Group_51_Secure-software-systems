@@ -5,7 +5,7 @@ Request/response models are intentionally not fixed until the owners agree them.
 | Owner | Draft endpoints |
 | --- | --- |
 | Varshil | POST /auth/register, /auth/login, /auth/logout; GET /auth/verify |
-| Ved | POST /eligibility/enrol, /eligibility/check, /eligibility/authorizations |
+| Ved | POST /eligibility/enrol, /eligibility/check, /eligibility/authorizations, /eligibility/authorizations/redeem (service); GET /eligibility/status/{voter_id}; see app/eligibility/README.md |
 | Akshit | GET /ballots/template; POST /ballots |
 | Sashi | GET /candidates; POST /candidates; PATCH /candidates/{candidate_id} |
 | Moinul | POST /results/count; GET /results/{election_id}; POST /results/{election_id}/publish; GET /results/{election_id}/audit |
