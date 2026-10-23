@@ -47,3 +47,10 @@ button {
     margin-top: 20px;
     font-weight: bold;
 }
+.container { width: auto; max-width: 680px; margin: 24px auto; }
+input:not([type="checkbox"]) { display: block; width: 100%; box-sizing: border-box; padding: 10px; margin: 6px 0 16px; }
+fieldset { border: 1px solid #bbb; margin: 16px 0; }
+button:disabled { cursor: default; opacity: .55; }
+.candidate { gap: 16px; align-items: center; }
+#message { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .container { margin: 0; padding: 16px; } .candidate { flex-direction: column; align-items: stretch; } }

@@ -1,106 +1,45 @@
-from fastapi import HTTPException
-
-from .schemas import BallotSubmission
+"""Dynamic preference validation and authenticated ballot encryption."""
 import json
+import os
 from pathlib import Path
 
 from cryptography.fernet import Fernet
+from fastapi import HTTPException
 
-VALID_CANDIDATES = {
-    "CAND-001",
-    "CAND-002",
-    "CAND-003",
-    "CAND-004"
-}
+from app.shared.config import DATA
 
 
-def validate_ballot(ballot: BallotSubmission) -> None:
-    if len(ballot.preferences) != len(VALID_CANDIDATES):
-        raise HTTPException(
-            status_code=400,
-            detail="All candidates must receive a preference."
-        )
-
-    candidate_ids = [
-        preference.candidate_id
-        for preference in ballot.preferences
-    ]
-
-    ranks = [
-        preference.rank
-        for preference in ballot.preferences
-    ]
-
-    if len(set(candidate_ids)) != len(candidate_ids):
-        raise HTTPException(
-            status_code=400,
-            detail="Duplicate candidate detected."
-        )
-
-    if set(candidate_ids) != VALID_CANDIDATES:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid candidate detected."
-        )
-
-    expected_ranks = list(
-        range(1, len(VALID_CANDIDATES) + 1)
-    )
-
-    if sorted(ranks) != expected_ranks:
-        raise HTTPException(
-            status_code=400,
-            detail="Preferences must contain each rank exactly once."
-        )
-def verify_voter_authorisation(
-    auth_token: str | None,
-    role: str | None
-) -> None:
-    if auth_token != "ballot-demo-token":
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or missing authentication token."
-        )
-
-    if role != "voter":
-        raise HTTPException(
-            status_code=403,
-            detail="Only authorised voters can submit ballots."
-        )
-KEY_FILE = Path("data/ballot_key.key")
+def validate_ballot(ballot, candidates):
+    expected = {row["candidate_id"] for row in candidates}
+    ids = [item.candidate_id for item in ballot.preferences]
+    ranks = [item.rank for item in ballot.preferences]
+    if not expected or len(ids) != len(expected) or set(ids) != expected:
+        raise HTTPException(400, "Rank every active candidate exactly once")
+    if sorted(ranks) != list(range(1, len(expected) + 1)):
+        raise HTTPException(400, "Use each preference number exactly once")
 
 
-def load_or_create_key() -> bytes:
-    KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    if KEY_FILE.exists():
-        return KEY_FILE.read_bytes()
-
-    key = Fernet.generate_key()
-    KEY_FILE.write_bytes(key)
-    return key
+def build_anonymous_ballot_payload(ballot):
+    return {"preferences": [item.model_dump() for item in ballot.preferences]}
 
 
-cipher = Fernet(load_or_create_key())
+def encrypt_ballot(ballot, cipher):
+    payload = json.dumps(build_anonymous_ballot_payload(ballot), sort_keys=True)
+    return cipher.encrypt(payload.encode("utf-8")).decode("ascii")
 
 
-def encrypt_ballot(ballot: BallotSubmission) -> str:
-    ballot_data = build_anonymous_ballot_payload(ballot)
-
-    ballot_json = json.dumps(ballot_data)
-
-    encrypted_value = cipher.encrypt(
-        ballot_json.encode("utf-8")
-    )
-
-    return encrypted_value.decode("utf-8")
-def build_anonymous_ballot_payload(ballot: BallotSubmission) -> dict:
-    return {
-        "preferences": [
-            {
-                "candidate_id": preference.candidate_id,
-                "rank": preference.rank
-            }
-            for preference in ballot.preferences
-        ]
-    }
+def load_cipher(connection):
+    """Create one persistent local key. Never replace a lost key after voting."""
+    path = Path(os.getenv("BALLOT_KEY_FILE", str(DATA / "ballot_key.key")))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        if connection.execute("SELECT 1 FROM accepted_ballots LIMIT 1").fetchone():
+            raise ValueError("Ballot key is missing; restore the existing key")
+        try:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            with os.fdopen(descriptor, "wb") as key_file:
+                key_file.write(Fernet.generate_key())
+    return Fernet(path.read_bytes())
