@@ -85,15 +85,7 @@ cipher = Fernet(load_or_create_key())
 
 
 def encrypt_ballot(ballot: BallotSubmission) -> str:
-    ballot_data = {
-        "preferences": [
-            {
-                "candidate_id": preference.candidate_id,
-                "rank": preference.rank
-            }
-            for preference in ballot.preferences
-        ]
-    }
+    ballot_data = build_anonymous_ballot_payload(ballot)
 
     ballot_json = json.dumps(ballot_data)
 
@@ -102,3 +94,13 @@ def encrypt_ballot(ballot: BallotSubmission) -> str:
     )
 
     return encrypted_value.decode("utf-8")
+def build_anonymous_ballot_payload(ballot: BallotSubmission) -> dict:
+    return {
+        "preferences": [
+            {
+                "candidate_id": preference.candidate_id,
+                "rank": preference.rank
+            }
+            for preference in ballot.preferences
+        ]
+    }
