@@ -1,18 +1,48 @@
-# Ballot casting and privacy
-Owner: Akshit
+# Ballot Casting and Privacy Module
 
-Status: not implemented. All feature endpoints return HTTP 501.
+This module implements the Ballot Casting and Privacy functionality for the Electronic Voting Platform.
 
-Run the shared app with `python -m uvicorn app.main:app --reload`.
-For this module alone, use `python -m uvicorn app.ballot.standalone:app --reload`.
-Open `/static/ballot/index.html` for the placeholder screen and `/docs` for routes.
-Run this module's future tests with `python -m pytest tests/ballot`.
+## Implemented Security Requirements
 
-Implement in your own feature branch:
-- GUI in frontend/ballot/ and validated API models in schemas.py.
-- API routes, service rules, SQLite schema/repository and fictional seed data.
-- Positive and negative security tests linked to your four requirement issues.
-- API contract changes, report evidence and setup/demo instructions.
+### BAL-01 – Preferential Ballot Validation
+The system validates House of Representatives candidate rankings and rejects:
 
-Agree authentication, authorization and integration behavior before replacing placeholders.
-Never treat a client-supplied user ID or role as proof of authority.
+- duplicate preference ranks
+- missing preferences
+- duplicate candidates
+- invalid candidate identifiers
+
+### BAL-02 – Authorised Ballot Submission
+Ballot submission requires:
+
+- a valid authentication token
+- the `voter` role
+
+Unauthorised requests are rejected with HTTP 401 or HTTP 403 responses.
+
+### BAL-03 – Encrypted Ballot Storage
+Ballot preferences are encrypted using Fernet encryption before they are saved to the SQLite database.
+
+The encryption key is stored separately and excluded from Git.
+
+### BAL-04 – Anonymous Ballot Storage
+Stored ballots do not contain:
+
+- voter ID
+- voter name
+- username
+- email address
+- authentication token
+
+This keeps voter identity separate from voting preferences.
+
+## Module Structure
+
+```text
+app/ballot/
+├── __init__.py
+├── repository.py
+├── router.py
+├── schemas.py
+├── service.py
+└── standalone.py
